@@ -1,0 +1,55 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2513
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww16640\viewh12120\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 Household Pulse Workflow:\
+\
+\'97 FOR FOOD DATA \'97 \'93Access to Food\'94\
+\
+FOOD2 or FOOD2B - Food Sufficiency for All Households\
+1. Run the \'91food2 import.Rmd\'92 to import Food Table 2, and add to SQL database.\
+	In this code, update the week and state_abbr objects \
+	*If Food Table 2 published by the Census changes, this code may need to be adapted.\
+		[The version food2b import_weeks13.21 worked for weeks 13-21]\
+		[The version food2b import_weeks7.12 worked for weeks 7-12]\
+		[The version food2b import_weeks1.6 worked for weeks 1-6]\
+\
+FOOD 3 or FOOD3B - Food Sufficiency for Households with Children\
+2. Run the \'91food3 import.Rmd\'92 to import Food Table 3, and add to SQL database.\
+	In this code, update the week and state_abbr objects\
+	*If Food Table 3 published by the Census changes, this code may need to be adapted.\
+		[The version food3b import_weeks13.21 worked for weeks 13-21]\
+		[The version food3b import_weeks7.12 worked for weeks 7-12]\
+		[The version food3b import_weeks1.6 worked for weeks 1-6]\
+\
+FOOD5 - Recent Food Insufficiency for Households with Children\
+3. Run the \'91food5 import.Rmd\'94 to import Food Table 5, and add to SQL database.\
+	In this code, update the week and state_abbr objects\
+	*If Food Table 5 published by the Census changes, this code may need to be adapted.\
+		[The version food5_weeks13.21 import worked for weeks 13-21]\
+		[The version food5_weeks7.12 import worked for weeks 7-12]\
+		[The version food5_weeks6 import worked for week 6]\
+		[The version food5_weeks1.5 import worked for weeks 1-5]\
+\
+\
+4. Run the \'91food calculations.Rmd\'92 to create custom calculations needed for the data visualization. \
+	In this code, update the week and state_abbr objects\
+		[The version food calculations_weeks1.12 can be used to calculate trend data only for weeks 1-12]\
+\
+5. Food Data is now updated and can be exported with the file export\
+\
+\
+\
+\'97 FOR HOUSING DATA \'97 \'93Housing\'94\
+\
+\
+\
+\
+\'97 FOR EDUCATION DATA \'97 \'93Education\'94\
+\
+\
+\
+\'97 FOR HEALTH DATA \'97 \'93Health & Well-Being\'94}

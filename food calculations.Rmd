@@ -1,0 +1,426 @@
+---
+title: "Household Pulse Food Calculations"
+output: html_document
+---
+
+## This code uses data imported from Food Tables 2, 3, and 5 in order to calculate percentages used in the data viz.
+
+
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(httr)
+library(stringr)
+```
+
+## STEP 1: UPDATE THE MOST RECENT WEEK FOR DOWNLOADING DATA
+```{r}
+week <- 22
+state_abbr <- 'SD'
+```
+
+
+## STEP 2: CALCULATE ROLLING 4 "WEEK" AVERAGES
+# 2a) For Sometimes/Often Not Enough::Overalll, Households with Children, Households without Children
+# 2b) For Free Groceries/Meal in Last 7 Days:: Overall, Households with Children
+# 2c) For Children Not Eating Because Food was Unaffordable:: Households with Children
+# 2d) Combine data tables from 2a)-2c)
+```{r}
+week_minus1 <- week-1
+week_minus2 <- week-2
+week_minus3 <- week-3
+
+####### -- 2A) Calculate the Sometimes/Often Not Enough Percentages First -- #####
+
+#sql code to import most recent 4 weeks of food 2b data
+food_sql <- paste0("SELECT * FROM food2b WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"');")
+
+food_4weeks_data <- dbGetQuery(con,food_sql) %>%
+  
+  subset(categorynames=='children' | categorynames=='total') %>%
+  
+  #covert variables to numeric
+  mutate(foodinsufficient_numerator=as.numeric(paste(foodinsufficient_numerator)),
+         foodinsufficient_numerator_se=as.numeric(paste(foodinsufficient_numerator_se)),
+         totalvalidresponses=as.numeric(paste(totalvalidresponses)),
+         totalvalidresponses_se=as.numeric(paste(totalvalidresponses_se))) %>%
+  
+  #combine four weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(foodinsufficient_numerator=sum(foodinsufficient_numerator,na.rm=TRUE),
+            foodinsufficient_numerator_se=sqrt((sum(foodinsufficient_numerator_se^2))),
+            totalvalidresponses=sum(totalvalidresponses,na.rm=TRUE),
+            totalvalidresponses_se=sqrt((sum(totalvalidresponses_se^2))),
+            .groups='keep') %>%
+  ungroup %>%
+  arrange(categorynames,select_characteristics) %>%
+  
+  #calculate percent food insufficient, se, and confidence interval
+  mutate(percent=foodinsufficient_numerator/totalvalidresponses) %>%
+  mutate(percent_se=(1/totalvalidresponses)*(sqrt((foodinsufficient_numerator_se^2)-(percent*(totalvalidresponses_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/totalvalidresponses)*(sqrt((foodinsufficient_numerator_se^2)+(percent*(totalvalidresponses_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(foodinsufficient_numerator,foodinsufficient_numerator_se,
+            totalvalidresponses,totalvalidresponses_se,percent_relativese)) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus3),
+         week_end=all_of(week),
+         timeframe='4-week rolling average',
+         varname='sometimesoftennotenoughtoeat')
+
+
+####### -- 2B) Calculate the Free Groceries Percentages Next -- #####
+#In order to have both total and households with children, need data from tables 2b and 3b
+
+food_4weeks_data_overallfree <- dbGetQuery(con,food_sql) %>%
+  
+  subset(categorynames=='freegroceries') %>%
+  subset(select_characteristics != "Did not report") %>%
+  
+  #covert variables to numeric
+  mutate(total=as.numeric(paste(total)),
+         total_se=as.numeric(paste(total_se)),
+         enough_types_food=as.numeric(paste(enough_types_food)),
+         enough_types_food_se=as.numeric(paste(enough_types_food_se)),
+         enough_not_types=as.numeric(paste(enough_not_types)),
+         enough_not_types_se=as.numeric(paste(enough_not_types_se)),
+         sometimes_not_enough=as.numeric(paste(sometimes_not_enough)),
+         sometimes_not_enough_se=as.numeric(paste(sometimes_not_enough_se)),
+         often_not_enough=as.numeric(paste(often_not_enough)),
+         often_not_enough_se=as.numeric(paste(often_not_enough_se))) %>%
+  
+  #combine four weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(count_sums=sum(enough_types_food,enough_not_types,sometimes_not_enough,often_not_enough,na.rm=TRUE),
+            count_sums_se=sqrt((sum(enough_types_food_se^2)+sum(enough_not_types_se^2)+sum(sometimes_not_enough_se^2)+(sum(often_not_enough_se^2)))),.groups='keep')
+
+#create an overall column to merge
+overall_sum <- food_4weeks_data_overallfree %>%
+  group_by(categorynames,state) %>%
+  summarise(denominator_overall=sum(count_sums,na.rm=TRUE),
+            denominator_overall_se=sqrt(sum(count_sums_se^2)),.groups='keep') 
+
+#merge overall back with Yes/No
+food_4weeks_data_overallfree2 <- food_4weeks_data_overallfree %>%
+  left_join(overall_sum,by=c('categorynames'='categorynames','state'='state')) %>%
+  
+  #calculate percentages, keep only Yes
+  subset(select_characteristics=='Yes') %>%
+  mutate(percent=count_sums/denominator_overall,
+         percent_se=(1/denominator_overall)*(sqrt((count_sums_se^2)-(percent*(denominator_overall_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/denominator_overall)*(sqrt((count_sums_se^2)+(percent*(denominator_overall_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(count_sums,count_sums_se,
+            denominator_overall,denominator_overall_se,percent_relativese)) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus3),
+         week_end=all_of(week),
+         timeframe='4-week rolling average',
+         varname='freegroceriesorfreemeal',
+         select_characteristics='Total')
+
+
+### -- Repeat Steps for Table 3 -- ###
+#sql code to import most recent 4 weeks of food 2b data
+food_sql2 <- paste0("SELECT * FROM food3b WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"');")
+
+food_4weeks_data_childfree <- dbGetQuery(con,food_sql2) %>%
+  
+  subset(categorynames=='freegroceries') %>%
+  subset(select_characteristics != "Did not report") %>%
+  
+  #covert variables to numeric
+  mutate(total=as.numeric(paste(total)),
+         total_se=as.numeric(paste(total_se)),
+         enough_types_food=as.numeric(paste(enough_types_food)),
+         enough_types_food_se=as.numeric(paste(enough_types_food_se)),
+         enough_not_types=as.numeric(paste(enough_not_types)),
+         enough_not_types_se=as.numeric(paste(enough_not_types_se)),
+         sometimes_not_enough=as.numeric(paste(sometimes_not_enough)),
+         sometimes_not_enough_se=as.numeric(paste(sometimes_not_enough_se)),
+         often_not_enough=as.numeric(paste(often_not_enough)),
+         often_not_enough_se=as.numeric(paste(often_not_enough_se))) %>%
+  
+  #combine four weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(count_sums=sum(enough_types_food,enough_not_types,sometimes_not_enough,often_not_enough,na.rm=TRUE),
+            count_sums_se=sqrt((sum(enough_types_food_se^2)+sum(enough_not_types_se^2)+sum(sometimes_not_enough_se^2)+(sum(often_not_enough_se^2)))),.groups='keep')
+
+#create an overall column to merge
+overall_sum_child <- food_4weeks_data_childfree %>%
+  group_by(categorynames,state) %>%
+  summarise(denominator_overall=sum(count_sums,na.rm=TRUE),
+            denominator_overall_se=sqrt(sum(count_sums_se^2)),.groups='keep') 
+
+#merge overall back with Yes/No
+food_4weeks_data_childfree2 <- food_4weeks_data_overallfree %>%
+  left_join(overall_sum_child,by=c('categorynames'='categorynames','state'='state')) %>%
+  
+  #calculate percentages, keep only Yes
+  subset(select_characteristics=='Yes') %>%
+  mutate(percent=count_sums/denominator_overall,
+         percent_se=(1/denominator_overall)*(sqrt((count_sums_se^2)-(percent*(denominator_overall_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/denominator_overall)*(sqrt((count_sums_se^2)+(percent*(denominator_overall_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(count_sums,count_sums_se,
+            denominator_overall,denominator_overall_se,percent_relativese)) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus3),
+         week_end=all_of(week),
+         timeframe='4-week rolling average',
+         varname='freegroceriesorfreemeal',
+         select_characteristics='Children in household')
+
+
+
+
+####### -- 2C) Calculate Children Not Eating Enough Because Unaffordable -- #####
+
+#start by importing the data needed from table 5
+#sql code to import most recent 4 weeks of food 5 data
+unaffordable_sql <- paste0("SELECT * FROM food5 WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"');")
+
+unaffordable_4weeks_data <- dbGetQuery(con,unaffordable_sql) %>%
+  
+  #subset only for the category representing children not eating
+  subset(categorynames=='childrennoteating') %>%
+  #remove responses of Never and Did not report
+  subset(select_characteristics != 'Never') %>%
+  subset(select_characteristics !='Did not report') %>%
+  
+  #covert variables to numeric
+  mutate(total=as.numeric(paste(total)),
+         total_se=as.numeric(paste(total_se)),
+         enough_not_types=as.numeric(paste(enough_not_types)),
+         enough_not_types_se=as.numeric(paste(enough_not_types_se)),
+         sometimes_not_enough=as.numeric(paste(sometimes_not_enough)),
+         sometimes_not_enough_se=as.numeric(paste(sometimes_not_enough_se)),
+         often_not_enough=as.numeric(paste(often_not_enough)),
+         often_not_enough_se=as.numeric(paste(often_not_enough_se))) %>%
+  
+  #calculate the total minus did not report
+  rowwise() %>%
+  mutate(totalvalidresponses=sum(enough_not_types,sometimes_not_enough,often_not_enough,
+                                 na.rm=TRUE),
+         totalvalidresponses_se=sqrt((enough_not_types_se^2)+(sometimes_not_enough_se^2)+(often_not_enough_se^2))) %>%
+  
+  #combine total valid responses to get numerator across the four weeks
+  group_by(categorynames,state) %>%
+  summarise(children_not_eating=sum(totalvalidresponses,na.rm=TRUE),
+            children_not_eating_se=sqrt(sum(totalvalidresponses_se^2)),.groups='keep')
+
+
+#next, we need the total households with children from table food 3
+#sql code to import most recent 4 weeks of food 3 data
+totalhouseholds_sql <- paste0("SELECT * FROM food3b WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"');")
+
+totalhouseholds_4weeks_data <- dbGetQuery(con,totalhouseholds_sql) %>%
+  subset(select_characteristics=='Total') %>%
+  
+  #covert variables to numeric
+  mutate(totalvalidresponses=as.numeric(paste(totalvalidresponses)),
+         totalvalidresponses_se=as.numeric(paste(totalvalidresponses_se))) %>%
+  
+  #sum up the total valid responses
+  group_by(state,categorynames) %>%
+  summarise(totalhouseholdswithchildren=sum(totalvalidresponses,na.rm=TRUE),
+            totalhouseholdswithchildren_se=sqrt(sum(totalvalidresponses_se^2)),.groups='keep') %>%
+  ungroup %>%
+  select(-c(categorynames))
+
+#calculate the percentage
+food_4weeks_data_unaffordable <- unaffordable_4weeks_data %>%
+  left_join(totalhouseholds_4weeks_data,by=c('state'='state')) %>%
+  
+  #calculate percent
+  mutate(percent=children_not_eating/totalhouseholdswithchildren,
+         percent_se=(1/totalhouseholdswithchildren)*(sqrt((children_not_eating_se^2)-(percent*(totalhouseholdswithchildren_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/totalhouseholdswithchildren)*(sqrt((children_not_eating_se^2)+(percent*(totalhouseholdswithchildren_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(children_not_eating,children_not_eating_se,
+            totalhouseholdswithchildren,totalhouseholdswithchildren_se,percent_relativese)) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus3),
+         week_end=all_of(week),
+         timeframe='4-week rolling average',
+         varname='childrennoteatingbecauseunaffordable',
+         select_characteristics='Children in household')
+  
+  
+  
+
+  
+####### -- 2D) COMBINE DATA TABLES -- #####
+#combine three data tables
+food_4weeks_combined <- food_4weeks_data %>%
+  bind_rows(food_4weeks_data_overallfree2) %>%
+  bind_rows(food_4weeks_data_childfree2) %>%
+  bind_rows(food_4weeks_data_unaffordable)
+
+#DATA QUALITY CHECKS
+View(food_4weeks_combined)
+```
+
+
+## STEP 3: ADD ROLLING AVERAGE DATA TO SQL DATABASE
+```{r}
+dbWriteTable(con,'calculatedpercents',food_4weeks_combined,append=TRUE,row.names=FALSE)
+```
+
+
+## STEP 4: CALCULATE 12 "WEEK" AVERAGES FOR DEMOGRAPHICS
+```{r}
+week_minus1 <- week-1
+week_minus2 <- week-2
+week_minus3 <- week-3
+week_minus4 <- week-4
+week_minus5 <- week-5
+week_minus6 <- week-6
+week_minus7 <- week-7
+week_minus8 <- week-8
+week_minus9 <- week-9
+week_minus10 <- week-10
+week_minus11 <- week-11
+
+####### -- 2A) Calculate the Sometimes/Often Not Enough Percentages -- #####
+
+#sql code to import most recent 12 weeks of food 2b data
+food_sql <- paste0("SELECT * FROM food2b WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"' OR week='",week_minus4,"' OR week='",week_minus5,"' OR week='",week_minus6,"' OR week='",week_minus7,"' OR week='",week_minus8,"' OR week='",week_minus9,"' OR week='",week_minus10,"' OR week='",week_minus11,"');")
+
+
+food_12weeks_data <- dbGetQuery(con,food_sql) %>%
+  
+  subset(categorynames=='age' | categorynames=='race' | categorynames=='total' 
+         | categorynames=='income') %>%
+  
+  #combine racial groups and income groups
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='Two or more races + Other races, not Hispanic' | 
+                                          select_characteristics=='Black alone, not Hispanic' | 
+                                          select_characteristics=='Asian alone, not Hispanic','Other/multiracial, not Latino')) %>%
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='Less than $25,000' | 
+                                          select_characteristics=='$25,000 - $34,999' | 
+                                          select_characteristics=='$35,000 - $49,999','Less than $50,000')) %>%
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='$50,000 - $74,999' | 
+                                          select_characteristics=='$75,000 - $99,999' | 
+                                          select_characteristics=='$100,000 - $149,999'
+                                         | select_characteristics=='$150,000 - $199,999' | select_characteristics=='$200,000 and above','More than $50,000')) %>%
+  subset(select_characteristics != 'Did not report') %>%
+  
+  #covert variables to numeric
+  mutate(foodinsufficient_numerator=as.numeric(paste(foodinsufficient_numerator)),
+         foodinsufficient_numerator_se=as.numeric(paste(foodinsufficient_numerator_se)),
+         totalvalidresponses=as.numeric(paste(totalvalidresponses)),
+         totalvalidresponses_se=as.numeric(paste(totalvalidresponses_se))) %>%
+  
+  #combine 12 weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(foodinsufficient_numerator=sum(foodinsufficient_numerator,na.rm=TRUE),
+            foodinsufficient_numerator_se=sqrt((sum(foodinsufficient_numerator_se^2))),
+            totalvalidresponses=sum(totalvalidresponses,na.rm=TRUE),
+            totalvalidresponses_se=sqrt((sum(totalvalidresponses_se^2))),
+            .groups='keep') %>%
+  ungroup %>%
+  arrange(categorynames,select_characteristics) %>%
+  
+  #calculate percent food insufficient, se, and confidence interval
+  mutate(percent=foodinsufficient_numerator/totalvalidresponses) %>%
+  mutate(percent_se=(1/totalvalidresponses)*(sqrt((foodinsufficient_numerator_se^2)-(percent*(totalvalidresponses_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/totalvalidresponses)*(sqrt((foodinsufficient_numerator_se^2)+(percent*(totalvalidresponses_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(foodinsufficient_numerator,foodinsufficient_numerator_se,
+            totalvalidresponses,totalvalidresponses_se,percent_relativese)) %>%
+  
+  #rename some characteristics:
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='Total','All adults')) %>%
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='	
+Hispanic or Latino (may be of any race)','Latino (any race)')) %>%
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='White alone, not Hispanic','White, not Latino')) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus11),
+         week_end=all_of(week),
+         timeframe='12-week rolling average',
+         varname='sometimesoftennotenoughtoeat')
+
+
+
+
+#DATA QUALITY CHECKS
+View(food_12weeks_data)
+```
+
+
+## STEP 5: ADD ROLLING AVERAGE DATA TO SQL DATABASE
+```{r}
+dbWriteTable(con,'calculatedpercents',food_12weeks_data,append=TRUE,row.names=FALSE)
+```
+
+
+

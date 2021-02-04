@@ -1,0 +1,97 @@
+---
+title: "Household Pulse Food Calculations"
+output: html_document
+---
+
+#THIS CODE RUNS FOR WEEKS 1-12 ONLY THE 4-WEEK ROLLING AVERAGE, FOR FOOD INSUFFICIENCY PERCENTAGE
+## This code uses data imported from Food Tables 2, 3, and 5 in order to calculate percentages used in the data viz.
+
+
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(httr)
+library(stringr)
+```
+
+## STEP 1: UPDATE THE MOST RECENT WEEK FOR DOWNLOADING DATA
+```{r}
+week <- 12
+state_abbr <- 'SD'
+```
+
+
+## STEP 2: CALCULATE ROLLING 4 "WEEK" AVERAGES
+# 2a) For Sometimes/Often Not Enough::Overalll, Households with Children, Households without Children
+```{r}
+week_minus1 <- week-1
+week_minus2 <- week-2
+week_minus3 <- week-3
+
+####### -- 2A) Calculate the Sometimes/Often Not Enough Percentages First -- #####
+
+#sql code to import most recent 4 weeks of food 2b data
+food_sql <- paste0("SELECT * FROM food2b WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"');")
+
+food_4weeks_data <- dbGetQuery(con,food_sql) %>%
+  
+  subset(categorynames=='children' | categorynames=='total') %>%
+  
+  #covert variables to numeric
+  mutate(foodinsufficient_numerator=as.numeric(paste(foodinsufficient_numerator)),
+         foodinsufficient_numerator_se=as.numeric(paste(foodinsufficient_numerator_se)),
+         totalvalidresponses=as.numeric(paste(totalvalidresponses)),
+         totalvalidresponses_se=as.numeric(paste(totalvalidresponses_se))) %>%
+  
+  #combine four weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(foodinsufficient_numerator=sum(foodinsufficient_numerator,na.rm=TRUE),
+            foodinsufficient_numerator_se=sqrt((sum(foodinsufficient_numerator_se^2))),
+            totalvalidresponses=sum(totalvalidresponses,na.rm=TRUE),
+            totalvalidresponses_se=sqrt((sum(totalvalidresponses_se^2))),
+            .groups='keep') %>%
+  ungroup %>%
+  arrange(categorynames,select_characteristics) %>%
+  
+  #calculate percent food insufficient, se, and confidence interval
+  mutate(percent=foodinsufficient_numerator/totalvalidresponses) %>%
+  mutate(percent_se=(1/totalvalidresponses)*(sqrt((foodinsufficient_numerator_se^2)-(percent*(totalvalidresponses_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/totalvalidresponses)*(sqrt((foodinsufficient_numerator_se^2)+(percent*(totalvalidresponses_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(foodinsufficient_numerator,foodinsufficient_numerator_se,
+            totalvalidresponses,totalvalidresponses_se,percent_relativese)) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus3),
+         week_end=all_of(week),
+         timeframe='4-week rolling average',
+         varname='sometimesoftennotenoughtoeat')
+
+
+
+
+
+#DATA QUALITY CHECKS
+View(food_4weeks_data)
+```
+
+
+## STEP 3: ADD ROLLING AVERAGE DATA TO SQL DATABASE
+```{r}
+dbWriteTable(con,'calculatedpercents',food_4weeks_data,append=TRUE,row.names=FALSE)
+```
+
+
