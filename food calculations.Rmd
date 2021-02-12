@@ -16,7 +16,7 @@ library(stringr)
 
 ## STEP 1: UPDATE THE MOST RECENT WEEK FOR DOWNLOADING DATA
 ```{r}
-week <- 22
+week <- 23
 state_abbr <- 'SD'
 ```
 
@@ -58,8 +58,8 @@ food_4weeks_data <- dbGetQuery(con,food_sql) %>%
   
   #calculate percent food insufficient, se, and confidence interval
   mutate(percent=foodinsufficient_numerator/totalvalidresponses) %>%
-  mutate(percent_se=(1/totalvalidresponses)*(sqrt((foodinsufficient_numerator_se^2)-(percent*(totalvalidresponses_se^2))))) %>%
-  mutate(percent_se=if_else(is.na(percent_se),(1/totalvalidresponses)*(sqrt((foodinsufficient_numerator_se^2)+(percent*(totalvalidresponses_se^2)))),percent_se)) %>%
+  mutate(percent_se=(1/totalvalidresponses)*(sqrt((foodinsufficient_numerator_se^2)-((percent^2)*(totalvalidresponses_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/totalvalidresponses)*(sqrt((foodinsufficient_numerator_se^2)+((percent^2)*(totalvalidresponses_se^2)))),percent_se)) %>%
   mutate(percent_lci=percent-(percent_se*1.645)) %>%
   mutate(percent_uci=percent+(percent_se*1.645)) %>%
   
@@ -121,8 +121,8 @@ food_4weeks_data_overallfree2 <- food_4weeks_data_overallfree %>%
   #calculate percentages, keep only Yes
   subset(select_characteristics=='Yes') %>%
   mutate(percent=count_sums/denominator_overall,
-         percent_se=(1/denominator_overall)*(sqrt((count_sums_se^2)-(percent*(denominator_overall_se^2))))) %>%
-  mutate(percent_se=if_else(is.na(percent_se),(1/denominator_overall)*(sqrt((count_sums_se^2)+(percent*(denominator_overall_se^2)))),percent_se)) %>%
+         percent_se=(1/denominator_overall)*(sqrt((count_sums_se^2)-((percent^2)*(denominator_overall_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/denominator_overall)*(sqrt((count_sums_se^2)+((percent^2)*(denominator_overall_se^2)))),percent_se)) %>%
   mutate(percent_lci=percent-(percent_se*1.645)) %>%
   mutate(percent_uci=percent+(percent_se*1.645)) %>%
   
@@ -186,8 +186,8 @@ food_4weeks_data_childfree2 <- food_4weeks_data_overallfree %>%
   #calculate percentages, keep only Yes
   subset(select_characteristics=='Yes') %>%
   mutate(percent=count_sums/denominator_overall,
-         percent_se=(1/denominator_overall)*(sqrt((count_sums_se^2)-(percent*(denominator_overall_se^2))))) %>%
-  mutate(percent_se=if_else(is.na(percent_se),(1/denominator_overall)*(sqrt((count_sums_se^2)+(percent*(denominator_overall_se^2)))),percent_se)) %>%
+         percent_se=(1/denominator_overall)*(sqrt((count_sums_se^2)-((percent^2)*(denominator_overall_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/denominator_overall)*(sqrt((count_sums_se^2)+((percent^2)*(denominator_overall_se^2)))),percent_se)) %>%
   mutate(percent_lci=percent-(percent_se*1.645)) %>%
   mutate(percent_uci=percent+(percent_se*1.645)) %>%
   
@@ -274,8 +274,8 @@ food_4weeks_data_unaffordable <- unaffordable_4weeks_data %>%
   
   #calculate percent
   mutate(percent=children_not_eating/totalhouseholdswithchildren,
-         percent_se=(1/totalhouseholdswithchildren)*(sqrt((children_not_eating_se^2)-(percent*(totalhouseholdswithchildren_se^2))))) %>%
-  mutate(percent_se=if_else(is.na(percent_se),(1/totalhouseholdswithchildren)*(sqrt((children_not_eating_se^2)+(percent*(totalhouseholdswithchildren_se^2)))),percent_se)) %>%
+         percent_se=(1/totalhouseholdswithchildren)*(sqrt((children_not_eating_se^2)-((percent^2)*(totalhouseholdswithchildren_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/totalhouseholdswithchildren)*(sqrt((children_not_eating_se^2)+((percent^2)*(totalhouseholdswithchildren_se^2)))),percent_se)) %>%
   mutate(percent_lci=percent-(percent_se*1.645)) %>%
   mutate(percent_uci=percent+(percent_se*1.645)) %>%
   
@@ -379,8 +379,8 @@ food_12weeks_data <- dbGetQuery(con,food_sql) %>%
   
   #calculate percent food insufficient, se, and confidence interval
   mutate(percent=foodinsufficient_numerator/totalvalidresponses) %>%
-  mutate(percent_se=(1/totalvalidresponses)*(sqrt((foodinsufficient_numerator_se^2)-(percent*(totalvalidresponses_se^2))))) %>%
-  mutate(percent_se=if_else(is.na(percent_se),(1/totalvalidresponses)*(sqrt((foodinsufficient_numerator_se^2)+(percent*(totalvalidresponses_se^2)))),percent_se)) %>%
+  mutate(percent_se=(1/totalvalidresponses)*(sqrt((foodinsufficient_numerator_se^2)-((percent^2)*(totalvalidresponses_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/totalvalidresponses)*(sqrt((foodinsufficient_numerator_se^2)+((percent^2)*(totalvalidresponses_se^2)))),percent_se)) %>%
   mutate(percent_lci=percent-(percent_se*1.645)) %>%
   mutate(percent_uci=percent+(percent_se*1.645)) %>%
   
