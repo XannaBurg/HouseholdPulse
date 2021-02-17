@@ -44,6 +44,18 @@ FOOD5 - Recent Food Insufficiency for Households with Children\
 \
 \
 \'97 FOR HOUSING DATA \'97 \'93Housing\'94\
+HOUSING1B - Last month\'92s payment status for renter-occupied unites\
+1. Run the \'91housing1b import.Rmd\'92 to import Housing Table 1b, and add to SQL database.\
+	In this code, update the week and state_abbr objects\
+	*If Housing Table 1b published by the Census changes, this code may need to be adapted.\
+		[The version housing1b import_weeks13.21 import worked for weeks 13-21] \
+		[The version housing1b import_weeks7.12 import worked for weeks 7-12] \
+		[The version housing1b import_weeks1.6 import worked for weeks 1-6] \
+\
+2. Run the \'91housing calculations.Rmd\'92 to create custom calculation needed for the data visualization.\
+	In this code, update the week and state_abbr objects.\
+		[Trend data for weeks 1-12 is not calculated and stored since the question on being behind on rent included rent being deferred (e.g. different definition).]\
+\
 \
 \
 \

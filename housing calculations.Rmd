@@ -1,0 +1,197 @@
+---
+title: "Household Pulse Food Calculations"
+output: html_document
+---
+
+## This code uses data imported from Housing Table 1b in order to calculate percentages used in the data viz.
+
+
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(httr)
+library(stringr)
+```
+
+## STEP 1: UPDATE THE MOST RECENT WEEK FOR DOWNLOADING DATA
+```{r}
+week <- 23
+state_abbr <- 'SD'
+```
+
+
+## STEP 2: CALCULATE ROLLING 4 "WEEK" AVERAGES
+# 2a) For Percent Not Caught Up on Rent
+```{r}
+week_minus1 <- week-1
+week_minus2 <- week-2
+week_minus3 <- week-3
+
+####### -- 2A) Calculate the Percent Not Caught up on Rent -- #####
+
+#sql code to import most recent 4 weeks of food 2b data
+housing_sql <- paste0("SELECT * FROM housing1b WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"');")
+
+housing_4weeks_data <- dbGetQuery(con,housing_sql) %>%
+  
+  subset(categorynames=='children' | categorynames=='total') %>%
+  
+  #covert variables to numeric
+  mutate(notcaughtup_numerator=as.numeric(paste(notcaughtup_numerator)),
+         notcaughtup_numerator_se=as.numeric(paste(notcaughtup_numerator_se)),
+         notcaughtup_denominator=as.numeric(paste(notcaughtup_denominator)),
+         notcaughtup_denominator_se=as.numeric(paste(notcaughtup_denominator_se))) %>%
+  
+  #combine four weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(notcaughtup_numerator=sum(notcaughtup_numerator,na.rm=TRUE),
+            notcaughtup_numerator_se=sqrt((sum(notcaughtup_numerator_se^2))),
+            notcaughtup_denominator=sum(notcaughtup_denominator,na.rm=TRUE),
+            notcaughtup_denominator_se=sqrt((sum(notcaughtup_denominator_se^2))),
+            .groups='keep') %>%
+  ungroup %>%
+  arrange(categorynames,select_characteristics) %>%
+  
+  #calculate percent food insufficient, se, and confidence interval
+  mutate(percent=notcaughtup_numerator/notcaughtup_denominator) %>%
+  mutate(percent_se=(1/notcaughtup_denominator)*(sqrt((notcaughtup_numerator_se^2)-((percent^2)*(notcaughtup_denominator_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/notcaughtup_denominator)*(sqrt((notcaughtup_numerator_se^2)+((percent^2)*(notcaughtup_denominator_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(notcaughtup_numerator,notcaughtup_numerator_se,
+            notcaughtup_denominator,notcaughtup_denominator_se,percent_relativese)) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus3),
+         week_end=all_of(week),
+         timeframe='4-week rolling average',
+         varname='notcaughtuponrent')
+
+
+#DATA QUALITY CHECKS
+View(housing_4weeks_data)
+```
+
+
+## STEP 3: ADD ROLLING AVERAGE DATA TO SQL DATABASE
+```{r}
+dbWriteTable(con,'calculatedpercents',housing_4weeks_data,append=TRUE,row.names=FALSE)
+```
+
+
+## STEP 4: CALCULATE 12 "WEEK" AVERAGES FOR DEMOGRAPHICS
+```{r}
+week_minus1 <- week-1
+week_minus2 <- week-2
+week_minus3 <- week-3
+week_minus4 <- week-4
+week_minus5 <- week-5
+week_minus6 <- week-6
+week_minus7 <- week-7
+week_minus8 <- week-8
+week_minus9 <- week-9
+week_minus10 <- week-10
+week_minus11 <- week-11
+
+####### -- 4A) Calculate the Percent Not Caught up on Rent -- #####
+
+#sql code to import most recent 12 weeks of housing1b data
+housing_sql <- paste0("SELECT * FROM housing1b WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"' OR week='",week_minus4,"' OR week='",week_minus5,"' OR week='",week_minus6,"' OR week='",week_minus7,"' OR week='",week_minus8,"' OR week='",week_minus9,"' OR week='",week_minus10,"' OR week='",week_minus11,"');")
+
+
+housing_12weeks_data <- dbGetQuery(con,housing_sql) %>%
+  
+  subset(categorynames=='age' | categorynames=='race' | categorynames=='total' 
+         | categorynames=='income') %>%
+  
+  #combine racial groups and income groups
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='Two or more races + Other races, not Hispanic' | 
+                                          select_characteristics=='Black alone, not Hispanic' | 
+                                          select_characteristics=='Asian alone, not Hispanic','Other/multiracial, not Latino')) %>%
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='Less than $25,000' | 
+                                          select_characteristics=='$25,000 - $34,999' | 
+                                          select_characteristics=='$35,000 - $49,999','Less than $50,000')) %>%
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='$50,000 - $74,999' | 
+                                          select_characteristics=='$75,000 - $99,999' | 
+                                          select_characteristics=='$100,000 - $149,999'
+                                         | select_characteristics=='$150,000 - $199,999' | select_characteristics=='$200,000 and above','More than $50,000')) %>%
+  subset(select_characteristics != 'Did not report') %>%
+  
+  #covert variables to numeric
+  mutate(notcaughtup_numerator=as.numeric(paste(notcaughtup_numerator)),
+         notcaughtup_numerator_se=as.numeric(paste(notcaughtup_numerator_se)),
+         notcaughtup_denominator=as.numeric(paste(notcaughtup_denominator)),
+         notcaughtup_denominator_se=as.numeric(paste(notcaughtup_denominator_se))) %>%
+  
+  #combine 12 weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(notcaughtup_numerator=sum(notcaughtup_numerator,na.rm=TRUE),
+            notcaughtup_numerator_se=sqrt((sum(notcaughtup_numerator_se^2))),
+            notcaughtup_denominator=sum(notcaughtup_denominator,na.rm=TRUE),
+            notcaughtup_denominator_se=sqrt((sum(notcaughtup_denominator_se^2))),
+            .groups='keep') %>%
+  ungroup %>%
+  arrange(categorynames,select_characteristics) %>%
+  
+  #calculate percent food insufficient, se, and confidence interval
+  mutate(percent=notcaughtup_numerator/notcaughtup_denominator) %>%
+  mutate(percent_se=(1/notcaughtup_denominator)*(sqrt((notcaughtup_numerator_se^2)-((percent^2)*(notcaughtup_denominator_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/notcaughtup_denominator)*(sqrt((notcaughtup_numerator_se^2)+((percent^2)*(notcaughtup_denominator_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(notcaughtup_numerator,notcaughtup_numerator_se,
+            notcaughtup_denominator,notcaughtup_denominator_se,percent_relativese)) %>%
+  
+  #rename some characteristics:
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='Total','All adults')) %>%
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='	
+Hispanic or Latino (may be of any race)','Latino (any race)')) %>%
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='White alone, not Hispanic','White, not Latino')) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus11),
+         week_end=all_of(week),
+         timeframe='12-week rolling average',
+         varname='notcaughtuponrent')
+
+
+
+
+#DATA QUALITY CHECKS
+View(housing_12weeks_data)
+```
+
+
+## STEP 5: ADD ROLLING AVERAGE DATA TO SQL DATABASE
+```{r}
+dbWriteTable(con,'calculatedpercents',housing_12weeks_data,append=TRUE,row.names=FALSE)
+```
+
+
+
