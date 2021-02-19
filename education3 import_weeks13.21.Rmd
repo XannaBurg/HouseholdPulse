@@ -1,0 +1,199 @@
+---
+title: "Household Pulse Education 3"
+output: html_document
+---
+
+#THIS CODE WORKS FOR WEEKS 13-21
+#STORE DATA IN SQL DATABASE: education3
+
+## This code simply imports the data from Education Table 3, and calculates a nonresponse percent.
+
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(httr)
+library(stringr)
+```
+
+## STEP 1: UPDATE THE MOST RECENT WEEK FOR DOWNLOADING DATA
+```{r}
+week <- 21
+state_abbr <- 'MT'
+```
+
+## STEP 2: IMPORT MOST RECENT WEEK OF DATA
+```{r}
+#Parent directory by week: https://www2.census.gov/programs-surveys/demo/tables/hhp/2020/
+
+#Education table 3 column names
+education3_colnames <-
+  c("select_characteristics", "total", "computer_always", "computer_usually", "computer_sometimes", "computer_rarely", "computer_never", "computer_did_not_report", "internet_always", "internet_usually", "internet_sometimes", "internet_rarely", "internet_never", "internet_did_not_report")
+categorynames <- c('total','age','age','age','age','age',
+                          'sex','sex',
+                          'race','race','race','race','race',
+                          'education','education','education','education',
+                          'maritalstatus','maritalstatus','maritalstatus',
+                          'maritalstatus','maritalstatus',
+                          'children','children',
+                          'computer_source','computer_source',
+                          'computer_source','computer_source',
+                          'internet_source','internet_source',
+                          'internet_source','internet_source',
+                          'lossincome','lossincome','lossincome',
+                          'currentemploy','currentemploy',
+                          'currentemploy',
+                          'food_sufficiency','food_sufficiency','food_sufficiency',
+                          'food_sufficiency','food_sufficiency',
+                          'income','income','income','income','income','income',
+                          'income','income','income')
+
+#Import from Census parent directory
+temp.file <- paste(tempfile(),".xlsx",sep = "")
+download.file(paste0
+                ("https://www2.census.gov/programs-surveys/demo/tables/hhp/2020/wk",week,"/educ3_week",week,".xlsx"), 
+                temp.file, mode = "wb")
+
+education3_data <- read_excel(temp.file, sheet=paste0(state_abbr),skip = 5) %>%
+    set_names(education3_colnames) %>%
+  
+  #remove extra rows at beginning and end
+    subset(!is.na(select_characteristics)) %>%
+    filter(!str_detect(select_characteristics, "Totals may not sum")) %>%
+    filter(!str_detect(select_characteristics, "The Census Bureau considers")) %>%
+    filter(!str_detect(select_characteristics, "Select characteristics")) %>%
+  
+  #remove row headers, but then add back in category name
+    subset(!is.na(total)) %>%
+    add_column(categorynames) %>%
+  
+  #assign dashes to NA
+    na_if("-") %>%
+  
+  #convert numeric variables to numeric
+    mutate_at(vars(total,computer_always,computer_usually,computer_sometimes,computer_rarely,computer_never,computer_did_not_report,internet_always,internet_usually,internet_sometimes,internet_rarely,internet_never,internet_did_not_report),
+              list(~ as.numeric(.))) %>%
+  
+  #add in variable for week and state
+  mutate(week=all_of(week)) %>%
+  mutate(state=all_of(state_abbr)) %>%
+  
+  #calculate numerator, denominator for usually/always have computer and internet
+  rowwise() %>%
+  mutate(computer_usually_always_numerator=sum(computer_always,computer_usually,na.rm=TRUE),
+         computer_totalvalidresponses=sum(computer_always,computer_usually,computer_sometimes,computer_rarely,computer_never,na.rm=TRUE),
+         internet_usually_always_numerator=sum(internet_always,internet_usually,na.rm=TRUE),
+         internet_totalvalidresponses=sum(internet_always,internet_usually,internet_sometimes,internet_rarely,internet_never,na.rm=TRUE)) %>%
+  #calculate non-response rate for good measure
+  mutate(computer_nonresponse_percent=computer_did_not_report/total,
+         internet_nonresponse_percent=internet_did_not_report/total)
+
+##DATA QUALITY CHECKS
+View(education3_data)
+
+```
+
+## STEP 3: IMPORT AND ADD STANDARD ERROR
+```{r}
+#Parent directory by week: https://www2.census.gov/programs-surveys/demo/tables/hhp/2020/
+
+#Education table 3 column names
+education3_colnames <-
+  c("select_characteristics", "total", "computer_always", "computer_usually", "computer_sometimes", "computer_rarely", "computer_never", "computer_did_not_report", "internet_always", "internet_usually", "internet_sometimes", "internet_rarely", "internet_never", "internet_did_not_report")
+categorynames <- c('total','age','age','age','age','age',
+                          'sex','sex',
+                          'race','race','race','race','race',
+                          'education','education','education','education',
+                          'maritalstatus','maritalstatus','maritalstatus',
+                          'maritalstatus','maritalstatus',
+                          'children','children',
+                          'computer_source','computer_source',
+                          'computer_source','computer_source',
+                          'internet_source','internet_source',
+                          'internet_source','internet_source',
+                          'lossincome','lossincome','lossincome',
+                          'currentemploy','currentemploy',
+                          'currentemploy',
+                          'food_sufficiency','food_sufficiency','food_sufficiency',
+                          'food_sufficiency','food_sufficiency',
+                          'income','income','income','income','income','income',
+                          'income','income','income')
+
+#Import from Census parent directory
+temp.file <- paste(tempfile(),".xlsx",sep = "")
+download.file(paste0
+                ("https://www2.census.gov/programs-surveys/demo/tables/hhp/2020/wk",week,"/educ3_se_week",week,".xlsx"), 
+                temp.file, mode = "wb")
+
+education3_data_se <- read_excel(temp.file, sheet=paste0(state_abbr),skip = 5) %>%
+    set_names(education3_colnames) %>%
+  
+  #remove extra rows at beginning and end
+    subset(!is.na(select_characteristics)) %>%
+    filter(!str_detect(select_characteristics, "Totals may not sum")) %>%
+    filter(!str_detect(select_characteristics, "The Census Bureau considers")) %>%
+    filter(!str_detect(select_characteristics, "Select characteristics")) %>%
+  
+  #remove row headers, but then add back in category name
+    subset(!is.na(total)) %>%
+    add_column(categorynames) %>%
+  
+  #assign dashes to na
+    na_if("-") %>%
+  
+  #convert numeric variables to numeric
+    mutate_at(vars(total,computer_always,computer_usually,computer_sometimes,computer_rarely,computer_never,computer_did_not_report,internet_always,internet_usually,internet_sometimes,internet_rarely,internet_never,internet_did_not_report),
+              list(~ as.numeric(.))) %>%
+  
+  #convert NA's to zero
+  replace(is.na(.),0) %>%
+  
+  #add in variable for week and state
+  mutate(week=all_of(week)) %>%
+  mutate(state=all_of(state_abbr)) %>%
+  
+  #change variable names to _se
+  rename(total_se=total,
+         computer_always_se=computer_always,
+         computer_usually_se=computer_usually,
+         computer_sometimes_se=computer_sometimes,
+         computer_rarely_se=computer_rarely,
+         computer_never_se=computer_never,
+         computer_did_not_report_se=computer_did_not_report,
+         internet_always_se=internet_always,
+         internet_usually_se=internet_usually,
+         internet_sometimes_se=internet_sometimes,
+         internet_rarely_se=internet_rarely,
+         internet_never_se=internet_never,
+         internet_did_not_report_se=internet_did_not_report) %>%
+  
+  #calculate numerator, denominator for usually/always have computer and internet
+  mutate(computer_usually_always_numerator_se=sqrt((computer_always_se^2)+(computer_usually_se^2)),
+         computer_totalvalidresponses_se=sqrt((computer_always_se^2)+(computer_usually_se^2)+(computer_sometimes_se^2)+(computer_rarely_se^2)+(computer_never_se^2)),
+         internet_usually_always_numerator_se=sqrt((internet_always_se^2)+(internet_usually_se^2)),
+         internet_totalvalidresponses_se=sqrt((internet_always_se^2)+(internet_usually_se^2)+(internet_sometimes_se^2)+(internet_rarely_se^2)+(internet_never_se^2)))
+           
+  
+
+##DATA QUALITY CHECKS
+View(education3_data_se)
+
+```
+
+## STEP 4: COMBINE DATA AND STANDARD ERROR
+```{r}
+education3_datacombined <- education3_data %>%
+  left_join(education3_data_se,by=c('select_characteristics'='select_characteristics',
+                             'week'='week','categorynames'='categorynames',
+                             'state'='state'))
+
+##DATA QUALITY CHECKS
+View(education3_datacombined)
+```
+
+## STEP 5: ADD MOST RECENT WEEK DATA TO SQL DATABASE
+```{r}
+dbWriteTable(con,'education3',education3_datacombined,append=TRUE,row.names=FALSE)
+```
+
+
