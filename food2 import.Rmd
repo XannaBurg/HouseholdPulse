@@ -18,7 +18,7 @@ library(stringr)
 
 ## STEP 1: UPDATE THE MOST RECENT WEEK FOR DOWNLOADING DATA
 ```{r}
-week <- 23
+week <- 24
 state_abbr <- 'SD'
 ```
 
@@ -212,7 +212,7 @@ View(food2b_data_se)
 
 ```
 
-## STEP 3: COMBINE DATA AND STANDARD ERROR
+## STEP 4: COMBINE DATA AND STANDARD ERROR
 ```{r}
 food2b_datacombined <- food2b_data %>%
   left_join(food2b_data_se,by=c('select_characteristics'='select_characteristics',
@@ -223,7 +223,7 @@ food2b_datacombined <- food2b_data %>%
 View(food2b_datacombined)
 ```
 
-## STEP 3: ADD MOST RECENT WEEK DATA TO SQL DATABASE
+## STEP 5: ADD MOST RECENT WEEK DATA TO SQL DATABASE
 ```{r}
 dbWriteTable(con,'food2b',food2b_datacombined,append=TRUE,row.names=FALSE)
 ```
