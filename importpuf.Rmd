@@ -1,0 +1,101 @@
+---
+title: "Import PUF"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(tidycensus)
+library(readxl)
+library(httr)
+library(stringr)
+library(survey)
+library(srvyr)
+```
+
+```{r}
+week <- 21
+statename <- 'Montana'
+
+
+
+#DO NOT EDIT 
+#county and state names that match fips codes (from tidycensus package)
+fips <- fips_codes
+#for FIPS code matching state name
+statecode <- as.numeric(unique(fips$state_code[fips$state_name==statename]))
+```
+
+```{r}
+#read in the csv file and replicate weight file
+puf_currentweek <- read.csv(paste0("./puf/pulse2020_puf_",week,".csv"))
+puf_repwts_currentweek <- read.csv(paste0("./puf/pulse2020_repwgt_puf_",week,".csv")) %>%
+  select(c(SCRAM,starts_with('PWEIGHT')))
+
+
+puf_cleaned <- puf_currentweek %>%
+  subset(EST_ST==all_of(statecode)) %>% #subset for state of interest
+  
+  #recode demographic variables of interest
+  mutate(race_recode=case_when(
+    RRACE=='1' ~ 'White',
+    RRACE=='2' | RRACE=='3' | RRACE=='4' ~ 'Other/multiracial')) %>%
+  mutate(ethnicity_recode=case_when(
+    RHISPANIC=='1' ~ 'Non-Hispanic',
+    RHISPANIC=='2' ~ 'Hispanic')) %>%
+  mutate(householdswithchildren=case_when(
+    THHLD_NUMKID==0 ~ 'Adults with no children in household',
+    THHLD_NUMKID>=1 ~ 'Adults with children in household')) %>%
+  mutate(age=2020-TBIRTH_YEAR) %>%
+  mutate(age_recode=case_when(
+    age<=24 ~ '18-24',
+    age>24 & age <=39 ~ '25-39',
+    age>39 & age <=54 ~ '40-54',
+    age>54 & age <=64 ~ '55-64',
+    age>=65 ~ '65 and above')) %>%
+  mutate(income_recode=case_when(
+    INCOME=='1' | INCOME=='2' | INCOME=='3' ~ 'Less than $50,000',
+    INCOME=='4' | INCOME=='5' | INCOME=='6' | 
+      INCOME=='7' | INCOME=='8' ~ 'More than $50,000',
+    INCOME=='-99' | INCOME=='-88' ~ 'Did not report')) %>%
+  
+  #recode the food sufficiency
+  mutate(food_sufficiency_recode=case_when(
+    CURFOODSUF=='1' ~ 'enough_types_food',
+    CURFOODSUF=='2' ~ 'enough_not_types',
+    CURFOODSUF=='3' ~ 'sometimes_not_enough',
+    CURFOODSUF=='4' ~ 'often_not_enough',
+    CURFOODSUF=='-99' | CURFOODSUF=='-88' ~ 'did_not_report')) %>%
+  
+  #merge replicate weights
+  left_join(puf_repwts_currentweek,by=c('SCRAM'='SCRAM')) 
+
+
+
+#import survey design to use in the srvyr package
+svy <- as_survey(puf_cleaned,weights=PWEIGHT,repweights=matches("pweight\\d"),
+                 scale=4/80,
+                 rscales=rep(1,80),
+                 mse=TRUE,
+                 type='JK1')
+  
+
+
+#check to see if person weights add to published tables
+#822,204 (MT) 
+sum(puf_cleaned$PWEIGHT)
+```
+
+
+#Food Sufficiency Data
+```{r}
+
+## -- OVERALL -- ##
+#calculate the weighted food sufficiency counts and se
+overall_food <- svy %>%
+  group_by(food_sufficiency_recode) %>%
+  survey_count() %>%
+  pivot_wider(names_from='food_sufficiency_recode',values_from=c('n','n_se')) %>%
+  mutate(select_characteristics='Total') #add back in identifier of category
+
+```
