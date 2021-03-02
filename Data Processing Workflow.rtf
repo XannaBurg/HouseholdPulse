@@ -62,17 +62,23 @@ HOUSING1B - Last month\'92s payment status for renter-occupied unites\
 \
 \'97 FOR EDUCATION DATA \'97 \'93Education\'94\
 EDUCATION3 - Computer and internet availability in households with children in public or private school\
-1. Run the \'91education3 import.RMD\'92 to import Education Table 3, and add to SQL database.\
+1. Run the \'91education3 import.Rmd\'92 to import Education Table 3, and add to SQL database.\
 	In this code, update the week and state_abbr objects\
 	*If Education Table 3 published by the Census changes, this code may need to be adapted.\
 		[The version education3 import_weeks13.21 import worked for weeks 13-21]\
-		The version education3 import_weeks1.12 import worked for weeks 1-12]\
+		[The version education3 import_weeks1.12 import worked for weeks 1-12]\
 \
 \
-EDUCATION6\
-2.\
+EDUCATION6 - Impact of Coronavirus Pandemic on Post-Secondary Education Plans\
+2. Run the \'91education6 Import. Rmd\'92 to import Education Table 6, and add to SQL database.\
+	In this code, update the week and state_abbr objects\
+	*If Education Table 6 published by the Census changes, this code may need to be adapted.\
+		[The version education 6 import_weeks 13.21 import worked for weeks 13-21]\
+		[Note: there was no table 6 for weeks 1-12.]\
 \
-3. Run the \'91 \'92\
+3. Run the \'91education calculations.Rmd\'92 to create custom calculations needed for the data visualization.\
+	In this code, update the week and state_abbr objects.\
+		[Demographic data is not calculated prior to weeks 13-16]\
 \
 \
 \

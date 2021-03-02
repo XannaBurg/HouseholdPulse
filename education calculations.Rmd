@@ -1,0 +1,403 @@
+---
+title: "Household Pulse Education Calculations"
+output: html_document
+---
+
+## This code uses data imported from Education Tables 3 and 6 in order to calculate percentages used in the data viz.
+
+
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(httr)
+library(stringr)
+```
+
+## STEP 1: UPDATE THE MOST RECENT WEEK FOR DOWNLOADING DATA
+```{r}
+week <- 24
+state_abbr <- 'SD'
+```
+
+
+## STEP 2: CALCULATE ROLLING 4 "WEEK" AVERAGES
+```{r}
+week_minus1 <- week-1
+week_minus2 <- week-2
+week_minus3 <- week-3
+
+####### -- Calculate Internet Usually/Always Available -- #####
+
+#sql code to import most recent 4 weeks of education table 3 data
+education_sql <- paste0("SELECT * FROM education3 WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"');")
+
+education_4weeks_data <- dbGetQuery(con,education_sql) %>%
+  
+  subset(categorynames=='total') %>%
+  
+  #covert variables to numeric
+  mutate(internet_usually_always_numerator=
+           as.numeric(paste(internet_usually_always_numerator)),
+         internet_usually_always_numerator_se=
+           as.numeric(paste(internet_usually_always_numerator_se)),
+         internet_totalvalidresponses=as.numeric(paste(internet_totalvalidresponses)),
+         internet_totalvalidresponses_se=as.numeric(paste(internet_totalvalidresponses_se))) %>%
+  
+  #combine four weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(internet_usually_always_numerator=sum(internet_usually_always_numerator,na.rm=TRUE),
+            internet_usually_always_numerator_se=sqrt((sum(internet_usually_always_numerator_se^2))),
+            internet_totalvalidresponses=sum(internet_totalvalidresponses,na.rm=TRUE),
+            internet_totalvalidresponses_se=sqrt((sum(internet_totalvalidresponses_se^2))),
+            .groups='keep') %>%
+  ungroup %>%
+  arrange(categorynames,select_characteristics) %>%
+  
+  #calculate percent usually/always, se, and confidence interval
+  mutate(percent=internet_usually_always_numerator/internet_totalvalidresponses) %>%
+  mutate(percent_se=(1/internet_totalvalidresponses)*(sqrt((internet_usually_always_numerator_se^2)-((percent^2)*(internet_totalvalidresponses_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/internet_totalvalidresponses)*(sqrt((internet_usually_always_numerator_se^2)+((percent^2)*(internet_totalvalidresponses_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(internet_usually_always_numerator,internet_usually_always_numerator_se,
+            internet_totalvalidresponses,internet_totalvalidresponses_se,percent_relativese)) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus3),
+         week_end=all_of(week),
+         timeframe='4-week rolling average',
+         varname='internetusuallyalwaysavailable')
+
+
+
+####### -- Calculate Computer Usually/Always Available -- #####
+
+education_4weeks_data2 <- dbGetQuery(con,education_sql) %>%
+  
+  subset(categorynames=='total') %>%
+  
+  #covert variables to numeric
+  mutate(computer_usually_always_numerator=
+           as.numeric(paste(computer_usually_always_numerator)),
+         computer_usually_always_numerator_se=
+           as.numeric(paste(computer_usually_always_numerator_se)),
+         computer_totalvalidresponses=as.numeric(paste(computer_totalvalidresponses)),
+         computer_totalvalidresponses_se=as.numeric(paste(computer_totalvalidresponses_se))) %>%
+  
+  #combine four weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(computer_usually_always_numerator=sum(computer_usually_always_numerator,na.rm=TRUE),
+            computer_usually_always_numerator_se=sqrt((sum(computer_usually_always_numerator_se^2))),
+            computer_totalvalidresponses=sum(computer_totalvalidresponses,na.rm=TRUE),
+            computer_totalvalidresponses_se=sqrt((sum(computer_totalvalidresponses_se^2))),
+            .groups='keep') %>%
+  ungroup %>%
+  arrange(categorynames,select_characteristics) %>%
+  
+  #calculate percent usually/always, se, and confidence interval
+  mutate(percent=computer_usually_always_numerator/computer_totalvalidresponses) %>%
+  mutate(percent_se=(1/computer_totalvalidresponses)*(sqrt((computer_usually_always_numerator_se^2)-((percent^2)*(computer_totalvalidresponses_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/computer_totalvalidresponses)*(sqrt((computer_usually_always_numerator_se^2)+((percent^2)*(computer_totalvalidresponses_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(computer_usually_always_numerator,computer_usually_always_numerator_se,
+            computer_totalvalidresponses,computer_totalvalidresponses_se,percent_relativese)) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus3),
+         week_end=all_of(week),
+         timeframe='4-week rolling average',
+         varname='computerusuallyalwaysavailable')
+
+
+####### -- COMBINE DATA TABLES -- #####
+#combine two data tables
+education_4weeks_combined <- education_4weeks_data %>%
+  bind_rows(education_4weeks_data2) 
+
+#DATA QUALITY CHECKS
+View(education_4weeks_combined)
+```
+
+
+## STEP 3: ADD ROLLING AVERAGE DATA TO SQL DATABASE
+```{r}
+dbWriteTable(con,'calculatedpercents',education_4weeks_combined,append=TRUE,row.names=FALSE)
+```
+
+
+## STEP 4: CALCULATE 12 "WEEK" AVERAGES FOR DEMOGRAPHICS
+```{r}
+week_minus1 <- week-1
+week_minus2 <- week-2
+week_minus3 <- week-3
+week_minus4 <- week-4
+week_minus5 <- week-5
+week_minus6 <- week-6
+week_minus7 <- week-7
+week_minus8 <- week-8
+week_minus9 <- week-9
+week_minus10 <- week-10
+week_minus11 <- week-11
+
+####### -- Calculate Internet Usually/Always Available -- #####
+
+#sql code to import most recent 12 weeks of education3 data
+education_sql <- paste0("SELECT * FROM education3 WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"' OR week='",week_minus4,"' OR week='",week_minus5,"' OR week='",week_minus6,"' OR week='",week_minus7,"' OR week='",week_minus8,"' OR week='",week_minus9,"' OR week='",week_minus10,"' OR week='",week_minus11,"');")
+
+
+education_12weeks_data <- dbGetQuery(con,education_sql) %>%
+  
+  subset(categorynames=='age' | categorynames=='race' | categorynames=='total' 
+         | categorynames=='income') %>%
+  
+  #combine racial groups and income groups
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='Two or more races + Other races, not Hispanic' | 
+                                          select_characteristics=='Black alone, not Hispanic' | 
+                                          select_characteristics=='Asian alone, not Hispanic','Other/multiracial, not Latino')) %>%
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='Less than $25,000' | 
+                                          select_characteristics=='$25,000 - $34,999' | 
+                                          select_characteristics=='$35,000 - $49,999','Less than $50,000')) %>%
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='$50,000 - $74,999' | 
+                                          select_characteristics=='$75,000 - $99,999' | 
+                                          select_characteristics=='$100,000 - $149,999'
+                                         | select_characteristics=='$150,000 - $199,999' | select_characteristics=='$200,000 and above','More than $50,000')) %>%
+  subset(select_characteristics != 'Did not report') %>%
+  
+  #covert variables to numeric
+  mutate(internet_usually_always_numerator=
+           as.numeric(paste(internet_usually_always_numerator)),
+         internet_usually_always_numerator_se=
+           as.numeric(paste(internet_usually_always_numerator_se)),
+         internet_totalvalidresponses=as.numeric(paste(internet_totalvalidresponses)),
+         internet_totalvalidresponses_se=as.numeric(paste(internet_totalvalidresponses_se))) %>%
+  
+  #combine twelve weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(internet_usually_always_numerator=sum(internet_usually_always_numerator,na.rm=TRUE),
+            internet_usually_always_numerator_se=sqrt((sum(internet_usually_always_numerator_se^2))),
+            internet_totalvalidresponses=sum(internet_totalvalidresponses,na.rm=TRUE),
+            internet_totalvalidresponses_se=sqrt((sum(internet_totalvalidresponses_se^2))),
+            .groups='keep') %>%
+  ungroup %>%
+  arrange(categorynames,select_characteristics) %>%
+  
+  #calculate percent usually/always, se, and confidence interval
+  mutate(percent=internet_usually_always_numerator/internet_totalvalidresponses) %>%
+  mutate(percent_se=(1/internet_totalvalidresponses)*(sqrt((internet_usually_always_numerator_se^2)-((percent^2)*(internet_totalvalidresponses_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/internet_totalvalidresponses)*(sqrt((internet_usually_always_numerator_se^2)+((percent^2)*(internet_totalvalidresponses_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(internet_usually_always_numerator,internet_usually_always_numerator_se,
+            internet_totalvalidresponses,internet_totalvalidresponses_se,percent_relativese)) %>%
+  
+
+  
+  #rename some characteristics:
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='Total','All adults')) %>%
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='	
+Hispanic or Latino (may be of any race)','Latino (any race)')) %>%
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='White alone, not Hispanic','White, not Latino')) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus11),
+         week_end=all_of(week),
+         timeframe='12-week rolling average',
+         varname='internetusuallyalwaysavailable')
+
+
+
+####### -- Calculate Computer Usually/Always Available -- #####
+education_12weeks_data2 <- dbGetQuery(con,education_sql) %>%
+  
+  subset(categorynames=='age' | categorynames=='race' | categorynames=='total' 
+         | categorynames=='income') %>%
+  
+  #combine racial groups and income groups
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='Two or more races + Other races, not Hispanic' | 
+                                          select_characteristics=='Black alone, not Hispanic' | 
+                                          select_characteristics=='Asian alone, not Hispanic','Other/multiracial, not Latino')) %>%
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='Less than $25,000' | 
+                                          select_characteristics=='$25,000 - $34,999' | 
+                                          select_characteristics=='$35,000 - $49,999','Less than $50,000')) %>%
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='$50,000 - $74,999' | 
+                                          select_characteristics=='$75,000 - $99,999' | 
+                                          select_characteristics=='$100,000 - $149,999'
+                                         | select_characteristics=='$150,000 - $199,999' | select_characteristics=='$200,000 and above','More than $50,000')) %>%
+  subset(select_characteristics != 'Did not report') %>%
+  
+  #covert variables to numeric
+  mutate(computer_usually_always_numerator=
+           as.numeric(paste(computer_usually_always_numerator)),
+         computer_usually_always_numerator_se=
+           as.numeric(paste(computer_usually_always_numerator_se)),
+         computer_totalvalidresponses=as.numeric(paste(computer_totalvalidresponses)),
+         computer_totalvalidresponses_se=as.numeric(paste(computer_totalvalidresponses_se))) %>%
+  
+  #combine twelve weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(computer_usually_always_numerator=sum(computer_usually_always_numerator,na.rm=TRUE),
+            computer_usually_always_numerator_se=sqrt((sum(computer_usually_always_numerator_se^2))),
+            computer_totalvalidresponses=sum(computer_totalvalidresponses,na.rm=TRUE),
+            computer_totalvalidresponses_se=sqrt((sum(computer_totalvalidresponses_se^2))),
+            .groups='keep') %>%
+  ungroup %>%
+  arrange(categorynames,select_characteristics) %>%
+  
+  #calculate percent usually sometimes, se, and confidence interval
+  mutate(percent=computer_usually_always_numerator/computer_totalvalidresponses) %>%
+  mutate(percent_se=(1/computer_totalvalidresponses)*(sqrt((computer_usually_always_numerator_se^2)-((percent^2)*(computer_totalvalidresponses_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/computer_totalvalidresponses)*(sqrt((computer_usually_always_numerator_se^2)+((percent^2)*(computer_totalvalidresponses_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(computer_usually_always_numerator,computer_usually_always_numerator_se,
+            computer_totalvalidresponses,computer_totalvalidresponses_se,percent_relativese)) %>%
+  
+
+  
+  #rename some characteristics:
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='Total','All adults')) %>%
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='	
+Hispanic or Latino (may be of any race)','Latino (any race)')) %>%
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='White alone, not Hispanic','White, not Latino')) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus11),
+         week_end=all_of(week),
+         timeframe='12-week rolling average',
+         varname='computerusuallyalwaysavailable')
+
+
+####### -- Calculate College Plans Canceled for Young Adults -- #####
+
+#sql code to import most recent 12 weeks of education6 data
+education_sql2 <- paste0("SELECT * FROM education6 WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"' OR week='",week_minus4,"' OR week='",week_minus5,"' OR week='",week_minus6,"' OR week='",week_minus7,"' OR week='",week_minus8,"' OR week='",week_minus9,"' OR week='",week_minus10,"' OR week='",week_minus11,"');")
+
+
+education_12weeks_data3 <- dbGetQuery(con,education_sql2) %>%
+  
+  subset(categorynames=='age' & select_characteristics=='18 - 24') %>%
+  
+  #covert variables to numeric
+  mutate(canceled=as.numeric(paste(canceled)),
+         canceled_se=as.numeric(paste(canceled_se)),
+         total=as.numeric(paste(total)),
+         total_se=as.numeric(paste(total_se)),
+         did_not_report=as.numeric(paste(did_not_report)),
+         did_not_report_se=as.numeric(paste(did_not_report_se))) %>%
+  
+  #combine twelve weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(canceled_numerator=sum(canceled,na.rm=TRUE),
+            canceled_numerator_se=sqrt((sum(canceled_se^2))),
+            did_not_report=sum(did_not_report,na.rm=TRUE),
+            did_not_report_se=sqrt((sum(did_not_report_se^2))),
+            total=sum(total,na.rm=TRUE),
+            total_se=sqrt((sum(total_se^2))),
+            totalvalidresponses=total-did_not_report,
+            totalvalidresponses_se=sqrt((total_se^2)-(did_not_report_se^2)),
+            .groups='keep') %>%
+  ungroup %>%
+  arrange(categorynames,select_characteristics) %>%
+  
+  #calculate percent cancelled, se, and confidence interval
+  mutate(percent=canceled_numerator/totalvalidresponses) %>%
+  mutate(percent_se=(1/totalvalidresponses)*(sqrt((canceled_numerator_se^2)-((percent^2)*(totalvalidresponses_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/totalvalidresponses)*(sqrt((canceled_numerator_se^2)+((percent^2)*(totalvalidresponses_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(canceled_numerator,canceled_numerator_se,did_not_report,did_not_report_se,
+            total,total_se,
+            totalvalidresponses,totalvalidresponses_se,percent_relativese)) %>%
+  
+
+  #add back in database variables
+  mutate(week_start=all_of(week_minus11),
+         week_end=all_of(week),
+         timeframe='12-week rolling average',
+         varname='postsecondaryeducationcanceled_youngadults')
+
+
+
+
+
+
+#COMBINE DATASETS
+education_12weeks_data_combined <- education_12weeks_data %>%
+  bind_rows(education_12weeks_data2) %>%
+  bind_rows(education_12weeks_data3)
+
+#DATA QUALITY CHECKS
+View(education_12weeks_data_combined)
+```
+
+
+## STEP 5: ADD ROLLING AVERAGE DATA TO SQL DATABASE
+```{r}
+dbWriteTable(con,'calculatedpercents',education_12weeks_data_combined,append=TRUE,row.names=FALSE)
+```
+
+
+
