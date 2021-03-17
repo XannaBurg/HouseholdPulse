@@ -1,0 +1,173 @@
+---
+title: "Household Pulse Health 2b"
+output: html_document
+---
+
+#THIS CODE WORKS FOR WEEKS 1-6
+#IMPORT HOUSEHOLD PULSE DATA FROM TABLE HEALTH 2b
+#STORE DATA IN SQL DATABASE: health2b
+
+## This code simply imports the data from Health Table2b.
+
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(httr)
+library(stringr)
+```
+
+## STEP 1: UPDATE THE MOST RECENT WEEK FOR DOWNLOADING DATA
+```{r}
+week <- 6
+state_abbr <- 'SD'
+```
+
+## STEP 2: IMPORT MOST RECENT WEEK OF DATA
+```{r}
+#Parent directory by week: https://www2.census.gov/programs-surveys/demo/tables/hhp/2020/
+
+#Health table 2b column names
+health2b_colnames <-
+  c("select_characteristics","nopleasure_not_at_all","nopleasure_several_days","nopleasure_half","nopleasure_everyday","nopleasure_did_not_report","depressed_not_at_all","depressed_several_days","depressed_half","depressed_everyday","depressed_did_not_report")
+categorynames <- c('total','age','age','age','age','age','age','age',
+                          'sex','sex',
+                          'race','race','race','race','race',
+                          'education','education','education','education',
+                          'maritalstatus','maritalstatus','maritalstatus',
+                          'maritalstatus','maritalstatus',
+                          'children','children','lossincome',
+                          'lossincome','lossincome',
+                          'currentemploy','currentemploy',
+                          'currentemploy',
+                          'income','income','income','income','income','income',
+                          'income','income','income')
+
+#Import from Census parent directory
+temp.file <- paste(tempfile(),".xlsx",sep = "")
+download.file(paste0
+                ("https://www2.census.gov/programs-surveys/demo/tables/hhp/2020/wk",week,"/health2b_week",week,".xlsx"), 
+                temp.file, mode = "wb")
+
+health2b_data <- read_excel(temp.file, sheet=paste0(state_abbr),skip = 5) %>%
+    set_names(health2b_colnames) %>%
+  
+  #remove extra rows at beginning and end
+    subset(!is.na(select_characteristics)) %>%
+    filter(!str_detect(select_characteristics, "Totals may not sum")) %>%
+    filter(!str_detect(select_characteristics, "The Census Bureau considers")) %>%
+    filter(!str_detect(select_characteristics, "Select characteristics")) %>%
+  
+  #remove row headers, but then add back in category name
+    subset(!is.na(nopleasure_not_at_all)) %>%
+    add_column(categorynames) %>%
+  
+  #assign dashes to NA
+    na_if("-") %>%
+  
+  #convert numeric variables to numeric
+    mutate_at(vars(nopleasure_not_at_all,nopleasure_several_days,nopleasure_half,nopleasure_everyday,nopleasure_did_not_report,depressed_not_at_all,depressed_several_days,depressed_half,depressed_everyday,depressed_did_not_report),
+              list(~ as.numeric(.))) %>%
+  
+  #add in variable for week and state
+  mutate(week=all_of(week)) %>%
+  mutate(state=all_of(state_abbr)) %>%
+  
+  #calculate numerator, denominator %>%
+  rowwise() %>%
+  #calculate non-response rate for good measure
+  mutate(nopleasure_nonresponse_percent=nopleasure_did_not_report/(nopleasure_not_at_all+nopleasure_several_days+nopleasure_half+nopleasure_everyday+nopleasure_did_not_report),
+         depressed_nonresponse_percent=depressed_did_not_report/(depressed_not_at_all+depressed_several_days+depressed_half+depressed_everyday+depressed_did_not_report))
+
+##DATA QUALITY CHECKS
+View(health2b_data)
+
+```
+
+## STEP 3: IMPORT AND ADD STANDARD ERROR
+```{r}
+#Parent directory by week: https://www2.census.gov/programs-surveys/demo/tables/hhp/2020/
+
+#Health table 2b column names
+health2b_colnames <-
+  c("select_characteristics","nopleasure_not_at_all","nopleasure_several_days","nopleasure_half","nopleasure_everyday","nopleasure_did_not_report","depressed_not_at_all","depressed_several_days","depressed_half","depressed_everyday","depressed_did_not_report")
+categorynames <- c('total','age','age','age','age','age','age','age',
+                          'sex','sex',
+                          'race','race','race','race','race',
+                          'education','education','education','education',
+                          'maritalstatus','maritalstatus','maritalstatus',
+                          'maritalstatus','maritalstatus',
+                          'children','children','lossincome',
+                          'lossincome','lossincome',
+                          'currentemploy','currentemploy',
+                          'currentemploy',
+                          'income','income','income','income','income','income',
+                          'income','income','income')
+
+#Import from Census parent directory
+temp.file <- paste(tempfile(),".xlsx",sep = "")
+download.file(paste0
+                ("https://www2.census.gov/programs-surveys/demo/tables/hhp/2020/wk",week,"/health2b_se_week",week,".xlsx"), 
+                temp.file, mode = "wb")
+
+health2b_data_se <- read_excel(temp.file, sheet=paste0(state_abbr),skip = 5) %>%
+    set_names(health2b_colnames) %>%
+  
+  #remove extra rows at beginning and end
+    subset(!is.na(select_characteristics)) %>%
+    filter(!str_detect(select_characteristics, "Totals may not sum")) %>%
+    filter(!str_detect(select_characteristics, "The Census Bureau considers")) %>%
+    filter(!str_detect(select_characteristics, "Select characteristics")) %>%
+  
+  #remove row headers, but then add back in category name
+    subset(!is.na(nopleasure_not_at_all)) %>%
+    add_column(categorynames) %>%
+  
+  #assign dashes to na
+    na_if("-") %>%
+  
+  #convert numeric variables to numeric
+    mutate_at(vars(nopleasure_not_at_all,nopleasure_several_days,nopleasure_half,nopleasure_everyday,nopleasure_did_not_report,depressed_not_at_all,depressed_several_days,depressed_half,depressed_everyday,depressed_did_not_report),
+              list(~ as.numeric(.))) %>%
+  
+  #convert NA's to zero
+  replace(is.na(.),0) %>%
+  
+  #add in variable for week and state
+  mutate(week=all_of(week)) %>%
+  mutate(state=all_of(state_abbr)) %>%
+  
+  #change variable names to _se
+  rename(nopleasure_not_at_all_se=nopleasure_not_at_all,
+         nopleasure_several_days_se=nopleasure_several_days,
+         nopleasure_half_se=nopleasure_half,
+         nopleasure_everyday_se=nopleasure_everyday,
+         nopleasure_did_not_report_se=nopleasure_did_not_report,
+         depressed_not_at_all_se=depressed_not_at_all,
+         depressed_several_days_se=depressed_several_days,
+         depressed_half_se=depressed_half,
+         depressed_everyday_se=depressed_everyday,
+         depressed_did_not_report_se=depressed_did_not_report) 
+
+
+##DATA QUALITY CHECKS
+View(health2b_data_se)
+
+```
+
+## STEP 4: COMBINE DATA AND STANDARD ERROR
+```{r}
+health2b_datacombined <- health2b_data %>%
+  left_join(health2b_data_se,by=c('select_characteristics'='select_characteristics',
+                             'week'='week','categorynames'='categorynames',
+                             'state'='state'))
+
+##DATA QUALITY CHECKS
+View(health2b_datacombined)
+```
+
+## STEP 5: ADD MOST RECENT WEEK DATA TO SQL DATABASE
+```{r}
+dbWriteTable(con,'health2b',health2b_datacombined,append=TRUE,row.names=FALSE)
+```
+

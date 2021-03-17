@@ -1,0 +1,520 @@
+---
+title: "Household Pulse Health Calculations"
+output: html_document
+---
+
+## This code uses data imported from Health Tables 1, 2a, and 2b in order to calculate percentages used in the data viz.
+
+
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(httr)
+library(stringr)
+```
+
+## STEP 1: UPDATE THE MOST RECENT WEEK FOR DOWNLOADING DATA
+```{r}
+week <- 4
+state_abbr <- 'SD'
+```
+
+
+## STEP 2: CALCULATE ROLLING 4 "WEEK" AVERAGES
+# 2a) Percent feeling down, depressed or hopeless more than half the days
+# 2b) Percent feeling nervous, anxious, or on edge more than half the days
+# 2c) Percent who have delayed medical care for something unrelated to COVID, but did not get it
+```{r}
+week_minus1 <- week-1
+week_minus2 <- week-2
+week_minus3 <- week-3
+
+
+####### -- 2A) Percent feeling down, depressed or hopeless more than half the days -- #####
+
+#sql code to import most recent 4 weeks of health 2b data
+health_depressed_sql <- paste0("SELECT * FROM health2b WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"');")
+
+health_depressed_4weeks_data <- dbGetQuery(con,health_depressed_sql) %>%
+  
+  subset(categorynames=='children' | categorynames=='total') %>%
+  
+  #covert variables to numeric
+  mutate(depressed_not_at_all=as.numeric(paste(depressed_not_at_all)),
+         depressed_not_at_all_se=as.numeric(paste(depressed_not_at_all_se)),
+         depressed_several_days=as.numeric(paste(depressed_several_days)),
+         depressed_several_days_se=as.numeric(paste(depressed_several_days_se)),
+         depressed_half=as.numeric(paste(depressed_half)),
+         depressed_half_se=as.numeric(paste(depressed_half_se)),
+         depressed_everyday=as.numeric(paste(depressed_everyday)),
+         depressed_everyday_se=as.numeric(paste(depressed_everyday_se))) %>%
+  
+  #calculate numerator and denominator
+  rowwise() %>%
+  mutate(depressed_numerator=sum(depressed_half,depressed_everyday,na.rm=TRUE),
+         depressed_numerator_se=sqrt((depressed_half_se^2)+(depressed_everyday_se^2)),
+         depressed_denominator=sum(depressed_not_at_all,depressed_several_days,depressed_half,depressed_everyday,na.rm=TRUE),
+         depressed_denominator_se=sqrt((depressed_not_at_all_se^2)+(depressed_several_days_se^2)+(depressed_half_se^2)+(depressed_everyday_se^2))) %>%
+  
+  #combine four weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(numerator=sum(depressed_numerator,na.rm=TRUE),
+            numerator_se=sqrt((sum(depressed_numerator_se^2))),
+            denominator=sum(depressed_denominator,na.rm=TRUE),
+            denominator_se=sqrt((sum(depressed_denominator_se^2))),
+            .groups='keep') %>%
+  ungroup %>%
+  arrange(categorynames,select_characteristics) %>%
+  
+  #calculate percent food insufficient, se, and confidence interval
+  mutate(percent=numerator/denominator) %>%
+  mutate(percent_se=(1/denominator)*(sqrt((numerator_se^2)-((percent^2)*(denominator_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/denominator)*(sqrt((numerator_se^2)+((percent^2)*(denominator_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(numerator,numerator_se,
+            denominator,denominator_se,percent_relativese)) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus3),
+         week_end=all_of(week),
+         timeframe='4-week rolling average',
+         varname='feelingdowndepressedorhopeless')
+
+
+
+####### -- 2B) Percent feeling nervous/anxious/on edge more than half the days -- #####
+
+#sql code to import most recent 4 weeks of health 2b data
+health_nervous_sql <- paste0("SELECT * FROM health2a WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"');")
+
+health_nervous_4weeks_data <- dbGetQuery(con,health_nervous_sql) %>%
+  
+  subset(categorynames=='children' | categorynames=='total') %>%
+  
+  #covert variables to numeric
+  mutate(nervous_not_at_all=as.numeric(paste(nervous_not_at_all)),
+         nervous_not_at_all_se=as.numeric(paste(nervous_not_at_all_se)),
+         nervous_several_days=as.numeric(paste(nervous_several_days)),
+         nervous_several_days_se=as.numeric(paste(nervous_several_days_se)),
+         nervous_half=as.numeric(paste(nervous_half)),
+         nervous_half_se=as.numeric(paste(nervous_half_se)),
+         nervous_everyday=as.numeric(paste(nervous_everyday)),
+         nervous_everyday_se=as.numeric(paste(nervous_everyday_se))) %>%
+  
+  #calculate numerator and denominator
+  rowwise() %>%
+  mutate(nervous_numerator=sum(nervous_half,nervous_everyday,na.rm=TRUE),
+         nervous_numerator_se=sqrt((nervous_half_se^2)+(nervous_everyday_se^2)),
+         nervous_denominator=sum(nervous_not_at_all,nervous_several_days,nervous_half,nervous_everyday,na.rm=TRUE),
+         nervous_denominator_se=sqrt((nervous_not_at_all_se^2)+(nervous_several_days_se^2)+(nervous_half_se^2)+(nervous_everyday_se^2))) %>%
+  
+  #combine four weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(numerator=sum(nervous_numerator,na.rm=TRUE),
+            numerator_se=sqrt((sum(nervous_numerator_se^2))),
+            denominator=sum(nervous_denominator,na.rm=TRUE),
+            denominator_se=sqrt((sum(nervous_denominator_se^2))),
+            .groups='keep') %>%
+  ungroup %>%
+  arrange(categorynames,select_characteristics) %>%
+  
+  #calculate percent food insufficient, se, and confidence interval
+  mutate(percent=numerator/denominator) %>%
+  mutate(percent_se=(1/denominator)*(sqrt((numerator_se^2)-((percent^2)*(denominator_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/denominator)*(sqrt((numerator_se^2)+((percent^2)*(denominator_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(numerator,numerator_se,
+            denominator,denominator_se,percent_relativese)) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus3),
+         week_end=all_of(week),
+         timeframe='4-week rolling average',
+         varname='feelingnervousanxiousoronedge')
+
+
+
+####### -- 2C) Percent who have delayed medical care for something unrelated to COVID, but did not get it -- #####
+
+#sql code to import most recent 4 weeks of food 2b data
+health_delay_sql <- paste0("SELECT * FROM health1 WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"');")
+
+health_delay_4weeks_data <- dbGetQuery(con,health_delay_sql) %>%
+  
+  subset(categorynames=='children' | categorynames=='total') %>%
+  
+  #covert variables to numeric
+  mutate(unrelated_delaycare_yes=as.numeric(paste(unrelated_delaycare_yes)),
+         unrelated_delaycare_yes_se=as.numeric(paste(unrelated_delaycare_yes_se)),
+         unrelated_delaycare_no=as.numeric(paste(unrelated_delaycare_no)),
+         unrelated_delaycare_no_se=as.numeric(paste(unrelated_delaycare_no_se))) %>%
+  
+  #calculate denominator
+  rowwise() %>%
+  mutate(unrelated_delaycare_denominator=sum(unrelated_delaycare_yes,unrelated_delaycare_no,na.rm=TRUE),
+         unrelated_delaycare_denominator_se=sqrt((unrelated_delaycare_yes_se^2)+(unrelated_delaycare_no_se^2))) %>%
+  
+  #combine four weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(numerator=sum(unrelated_delaycare_yes,na.rm=TRUE),
+            numerator_se=sqrt((sum(unrelated_delaycare_yes_se^2))),
+            denominator=sum(unrelated_delaycare_denominator,na.rm=TRUE),
+            denominator_se=sqrt((sum(unrelated_delaycare_denominator_se^2))),
+            .groups='keep') %>%
+  ungroup %>%
+  arrange(categorynames,select_characteristics) %>%
+  
+  #calculate percent food insufficient, se, and confidence interval
+  mutate(percent=numerator/denominator) %>%
+  mutate(percent_se=(1/denominator)*(sqrt((numerator_se^2)-((percent^2)*(denominator_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/denominator)*(sqrt((numerator_se^2)+((percent^2)*(denominator_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(numerator,numerator_se,
+            denominator,denominator_se,percent_relativese)) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus3),
+         week_end=all_of(week),
+         timeframe='4-week rolling average',
+         varname='delayedmedicalcareunrelatedtocovid')
+
+
+
+#COMBINE ALL THREE DATASETS
+health_4weeks_data <- health_depressed_4weeks_data %>%
+  bind_rows(health_nervous_4weeks_data) %>%
+  bind_rows(health_delay_4weeks_data)
+
+View(health_4weeks_data)
+```
+
+
+## STEP 3: ADD ROLLING AVERAGE DATA TO SQL DATABASE
+```{r}
+dbWriteTable(con,'calculatedpercents',health_4weeks_data,append=TRUE,row.names=FALSE)
+```
+
+
+## STEP 4: CALCULATE 12 "WEEK" AVERAGES FOR DEMOGRAPHICS
+```{r}
+week_minus1 <- week-1
+week_minus2 <- week-2
+week_minus3 <- week-3
+week_minus4 <- week-4
+week_minus5 <- week-5
+week_minus6 <- week-6
+week_minus7 <- week-7
+week_minus8 <- week-8
+week_minus9 <- week-9
+week_minus10 <- week-10
+week_minus11 <- week-11
+
+####### -- 4A) Percent feeling down, depressed or hopeless more than half the days -- #####
+
+#sql code to import most recent 12 weeks of housing1b data
+health_depressed_12_sql <- paste0("SELECT * FROM health2b WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"' OR week='",week_minus4,"' OR week='",week_minus5,"' OR week='",week_minus6,"' OR week='",week_minus7,"' OR week='",week_minus8,"' OR week='",week_minus9,"' OR week='",week_minus10,"' OR week='",week_minus11,"');")
+
+
+health_depressed_12weeks_data <- dbGetQuery(con,health_depressed_12_sql) %>%
+  
+  subset(categorynames=='age' | categorynames=='race' | categorynames=='total' 
+         | categorynames=='income') %>%
+  
+  #combine racial groups and income groups
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='Two or more races + Other races, not Hispanic' | 
+                                          select_characteristics=='Black alone, not Hispanic' | 
+                                          select_characteristics=='Asian alone, not Hispanic','Other/multiracial, not Latino')) %>%
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='Less than $25,000' | 
+                                          select_characteristics=='$25,000 - $34,999' | 
+                                          select_characteristics=='$35,000 - $49,999','Less than $50,000')) %>%
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='$50,000 - $74,999' | 
+                                          select_characteristics=='$75,000 - $99,999' | 
+                                          select_characteristics=='$100,000 - $149,999'
+                                         | select_characteristics=='$150,000 - $199,999' | select_characteristics=='$200,000 and above','More than $50,000')) %>%
+  subset(select_characteristics != 'Did not report') %>%
+  
+  #covert variables to numeric
+  mutate(depressed_not_at_all=as.numeric(paste(depressed_not_at_all)),
+         depressed_not_at_all_se=as.numeric(paste(depressed_not_at_all_se)),
+         depressed_several_days=as.numeric(paste(depressed_several_days)),
+         depressed_several_days_se=as.numeric(paste(depressed_several_days_se)),
+         depressed_half=as.numeric(paste(depressed_half)),
+         depressed_half_se=as.numeric(paste(depressed_half_se)),
+         depressed_everyday=as.numeric(paste(depressed_everyday)),
+         depressed_everyday_se=as.numeric(paste(depressed_everyday_se))) %>%
+  
+  #calculate numerator and denominator
+  rowwise() %>%
+  mutate(depressed_numerator=sum(depressed_half,depressed_everyday,na.rm=TRUE),
+         depressed_numerator_se=sqrt((depressed_half_se^2)+(depressed_everyday_se^2)),
+         depressed_denominator=sum(depressed_not_at_all,depressed_several_days,depressed_half,depressed_everyday,na.rm=TRUE),
+         depressed_denominator_se=sqrt((depressed_not_at_all_se^2)+(depressed_several_days_se^2)+(depressed_half_se^2)+(depressed_everyday_se^2))) %>%
+  
+  #combine four weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(numerator=sum(depressed_numerator,na.rm=TRUE),
+            numerator_se=sqrt((sum(depressed_numerator_se^2))),
+            denominator=sum(depressed_denominator,na.rm=TRUE),
+            denominator_se=sqrt((sum(depressed_denominator_se^2))),
+            .groups='keep') %>%
+  ungroup %>%
+  arrange(categorynames,select_characteristics) %>%
+  
+  #calculate percent food insufficient, se, and confidence interval
+  mutate(percent=numerator/denominator) %>%
+  mutate(percent_se=(1/denominator)*(sqrt((numerator_se^2)-((percent^2)*(denominator_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/denominator)*(sqrt((numerator_se^2)+((percent^2)*(denominator_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(numerator,numerator_se,
+            denominator,denominator_se,percent_relativese)) %>%
+  
+  #rename some characteristics:
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='Total','All adults')) %>%
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='	
+Hispanic or Latino (may be of any race)','Latino (any race)')) %>%
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='White alone, not Hispanic','White, not Latino')) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus11),
+         week_end=all_of(week),
+         timeframe='12-week rolling average',
+         varname='feelingdowndepressedorhopeless')
+
+
+
+####### -- 4B) Percent feeling nervous/anxious/on edge more than half the days -- #####
+#sql code to import most recent 12 weeks of housing1b data
+health_nervous_12_sql <- paste0("SELECT * FROM health2a WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"' OR week='",week_minus4,"' OR week='",week_minus5,"' OR week='",week_minus6,"' OR week='",week_minus7,"' OR week='",week_minus8,"' OR week='",week_minus9,"' OR week='",week_minus10,"' OR week='",week_minus11,"');")
+
+
+health_nervous_12weeks_data <- dbGetQuery(con,health_nervous_12_sql) %>%
+  
+  subset(categorynames=='age' | categorynames=='race' | categorynames=='total' 
+         | categorynames=='income') %>%
+  
+  #combine racial groups and income groups
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='Two or more races + Other races, not Hispanic' | 
+                                          select_characteristics=='Black alone, not Hispanic' | 
+                                          select_characteristics=='Asian alone, not Hispanic','Other/multiracial, not Latino')) %>%
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='Less than $25,000' | 
+                                          select_characteristics=='$25,000 - $34,999' | 
+                                          select_characteristics=='$35,000 - $49,999','Less than $50,000')) %>%
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='$50,000 - $74,999' | 
+                                          select_characteristics=='$75,000 - $99,999' | 
+                                          select_characteristics=='$100,000 - $149,999'
+                                         | select_characteristics=='$150,000 - $199,999' | select_characteristics=='$200,000 and above','More than $50,000')) %>%
+  subset(select_characteristics != 'Did not report') %>%
+  
+  #covert variables to numeric
+  mutate(nervous_not_at_all=as.numeric(paste(nervous_not_at_all)),
+         nervous_not_at_all_se=as.numeric(paste(nervous_not_at_all_se)),
+         nervous_several_days=as.numeric(paste(nervous_several_days)),
+         nervous_several_days_se=as.numeric(paste(nervous_several_days_se)),
+         nervous_half=as.numeric(paste(nervous_half)),
+         nervous_half_se=as.numeric(paste(nervous_half_se)),
+         nervous_everyday=as.numeric(paste(nervous_everyday)),
+         nervous_everyday_se=as.numeric(paste(nervous_everyday_se))) %>%
+  
+  #calculate numerator and denominator
+  rowwise() %>%
+  mutate(nervous_numerator=sum(nervous_half,nervous_everyday,na.rm=TRUE),
+         nervous_numerator_se=sqrt((nervous_half_se^2)+(nervous_everyday_se^2)),
+         nervous_denominator=sum(nervous_not_at_all,nervous_several_days,nervous_half,nervous_everyday,na.rm=TRUE),
+         nervous_denominator_se=sqrt((nervous_not_at_all_se^2)+(nervous_several_days_se^2)+(nervous_half_se^2)+(nervous_everyday_se^2))) %>%
+  
+  #combine four weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(numerator=sum(nervous_numerator,na.rm=TRUE),
+            numerator_se=sqrt((sum(nervous_numerator_se^2))),
+            denominator=sum(nervous_denominator,na.rm=TRUE),
+            denominator_se=sqrt((sum(nervous_denominator_se^2))),
+            .groups='keep') %>%
+  ungroup %>%
+  arrange(categorynames,select_characteristics) %>%
+  
+  #calculate percent food insufficient, se, and confidence interval
+  mutate(percent=numerator/denominator) %>%
+  mutate(percent_se=(1/denominator)*(sqrt((numerator_se^2)-((percent^2)*(denominator_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/denominator)*(sqrt((numerator_se^2)+((percent^2)*(denominator_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(numerator,numerator_se,
+            denominator,denominator_se,percent_relativese)) %>%
+  
+  #rename some characteristics:
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='Total','All adults')) %>%
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='	
+Hispanic or Latino (may be of any race)','Latino (any race)')) %>%
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='White alone, not Hispanic','White, not Latino')) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus11),
+         week_end=all_of(week),
+         timeframe='12-week rolling average',
+         varname='feelingnervousanxiousoronedge')
+
+
+####### -- 4c) Percent who have delayed medical care for something unrelated to COVID, but did not get it -- #####
+#sql code to import most recent 12 weeks of housing1b data
+health_delay_12_sql <- paste0("SELECT * FROM health1 WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"' OR week='",week_minus4,"' OR week='",week_minus5,"' OR week='",week_minus6,"' OR week='",week_minus7,"' OR week='",week_minus8,"' OR week='",week_minus9,"' OR week='",week_minus10,"' OR week='",week_minus11,"');")
+
+
+health_delay_12weeks_data <- dbGetQuery(con,health_delay_12_sql) %>%
+  
+  subset(categorynames=='age' | categorynames=='race' | categorynames=='total' 
+         | categorynames=='income') %>%
+  
+  #combine racial groups and income groups
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='Two or more races + Other races, not Hispanic' | 
+                                          select_characteristics=='Black alone, not Hispanic' | 
+                                          select_characteristics=='Asian alone, not Hispanic','Other/multiracial, not Latino')) %>%
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='Less than $25,000' | 
+                                          select_characteristics=='$25,000 - $34,999' | 
+                                          select_characteristics=='$35,000 - $49,999','Less than $50,000')) %>%
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='$50,000 - $74,999' | 
+                                          select_characteristics=='$75,000 - $99,999' | 
+                                          select_characteristics=='$100,000 - $149,999'
+                                         | select_characteristics=='$150,000 - $199,999' | select_characteristics=='$200,000 and above','More than $50,000')) %>%
+  subset(select_characteristics != 'Did not report') %>%
+  
+  #covert variables to numeric
+  mutate(unrelated_delaycare_yes=as.numeric(paste(unrelated_delaycare_yes)),
+         unrelated_delaycare_yes_se=as.numeric(paste(unrelated_delaycare_yes_se)),
+         unrelated_delaycare_no=as.numeric(paste(unrelated_delaycare_no)),
+         unrelated_delaycare_no_se=as.numeric(paste(unrelated_delaycare_no_se))) %>%
+  
+  #calculate denominator
+  rowwise() %>%
+  mutate(unrelated_delaycare_denominator=sum(unrelated_delaycare_yes,unrelated_delaycare_no,na.rm=TRUE),
+         unrelated_delaycare_denominator_se=sqrt((unrelated_delaycare_yes_se^2)+(unrelated_delaycare_no_se^2))) %>%
+  
+  #combine four weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(numerator=sum(unrelated_delaycare_yes,na.rm=TRUE),
+            numerator_se=sqrt((sum(unrelated_delaycare_yes_se^2))),
+            denominator=sum(unrelated_delaycare_denominator,na.rm=TRUE),
+            denominator_se=sqrt((sum(unrelated_delaycare_denominator_se^2))),
+            .groups='keep') %>%
+  ungroup %>%
+  arrange(categorynames,select_characteristics) %>%
+  
+  #calculate percent food insufficient, se, and confidence interval
+  mutate(percent=numerator/denominator) %>%
+  mutate(percent_se=(1/denominator)*(sqrt((numerator_se^2)-((percent^2)*(denominator_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/denominator)*(sqrt((numerator_se^2)+((percent^2)*(denominator_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(numerator,numerator_se,
+            denominator,denominator_se,percent_relativese)) %>%
+
+  #rename some characteristics:
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='Total','All adults')) %>%
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='	
+Hispanic or Latino (may be of any race)','Latino (any race)')) %>%
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='White alone, not Hispanic','White, not Latino')) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus11),
+         week_end=all_of(week),
+         timeframe='12-week rolling average',
+         varname='delayedmedicalcareunrelatedtocovid')
+
+
+
+#COMBINE ALL DATA
+health_12weeks_data <- health_depressed_12weeks_data %>%
+  bind_rows(health_nervous_12weeks_data) %>%
+  bind_rows(health_delay_12weeks_data)
+
+#DATA QUALITY CHECKS
+View(health_12weeks_data)
+```
+
+
+## STEP 5: ADD ROLLING AVERAGE DATA TO SQL DATABASE
+```{r}
+dbWriteTable(con,'calculatedpercents',health_12weeks_data,append=TRUE,row.names=FALSE)
+```
+
+
+

@@ -1,0 +1,183 @@
+---
+title: "Household Pulse Health 2a"
+output: html_document
+---
+
+#THIS CODE WORKS FOR WEEKS 13-21
+#IMPORT HOUSEHOLD PULSE DATA FROM TABLE HEALTH 2a
+#STORE DATA IN SQL DATABASE: health2a
+
+## This code simply imports the data from Health Table2a.
+
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(httr)
+library(stringr)
+```
+
+## STEP 1: UPDATE THE MOST RECENT WEEK FOR DOWNLOADING DATA
+```{r}
+week <- 21
+state_abbr <- 'SD'
+```
+
+## STEP 2: IMPORT MOST RECENT WEEK OF DATA
+```{r}
+#Parent directory by week: https://www2.census.gov/programs-surveys/demo/tables/hhp/2020/
+
+#Health table 2a column names
+health2a_colnames <-
+  c("select_characteristics","nervous_not_at_all","nervous_several_days","nervous_half","nervous_everyday","nervous_did_not_report","worry_not_at_all","worry_several_days","worry_half","worry_everyday","worry_did_not_report")
+categorynames <- c('total','age','age','age','age','age','age','age',
+                          'sex','sex',
+                          'race','race','race','race','race',
+                          'education','education','education','education',
+                          'maritalstatus','maritalstatus','maritalstatus',
+                          'maritalstatus','maritalstatus',
+                          'householdsize','householdsize','householdsize',
+                          'householdsize','householdsize','householdsize',
+                          'householdsize','children','children','lossincome',
+                          'lossincome','lossincome',
+                          'currentemploy','currentemploy',
+                          'currentemploy',
+                          'income','income','income','income','income','income',
+                          'income','income','income',
+                          'spending','spending','spending',
+                          'spending','spending','spending',
+                          'spending','spending','spending')
+
+#Import from Census parent directory
+temp.file <- paste(tempfile(),".xlsx",sep = "")
+download.file(paste0
+                ("https://www2.census.gov/programs-surveys/demo/tables/hhp/2020/wk",week,"/health2a_week",week,".xlsx"), 
+                temp.file, mode = "wb")
+
+health2a_data <- read_excel(temp.file, sheet=paste0(state_abbr),skip = 6) %>%
+    set_names(health2a_colnames) %>%
+  
+  #remove extra rows at beginning and end
+    subset(!is.na(select_characteristics)) %>%
+    filter(!str_detect(select_characteristics, "Totals may not sum")) %>%
+    filter(!str_detect(select_characteristics, "The Census Bureau considers")) %>%
+    filter(!str_detect(select_characteristics, "Select characteristics")) %>%
+  
+  #remove row headers, but then add back in category name
+    subset(!is.na(nervous_not_at_all)) %>%
+    add_column(categorynames) %>%
+  
+  #assign dashes to NA
+    na_if("-") %>%
+  
+  #convert numeric variables to numeric
+    mutate_at(vars(nervous_not_at_all,nervous_several_days,nervous_half,nervous_everyday,nervous_did_not_report,worry_not_at_all,worry_several_days,worry_half,worry_everyday,worry_did_not_report),
+              list(~ as.numeric(.))) %>%
+  
+  #add in variable for week and state
+  mutate(week=all_of(week)) %>%
+  mutate(state=all_of(state_abbr)) %>%
+  
+  #calculate numerator, denominator %>%
+  rowwise() %>%
+  #calculate non-response rate for good measure
+  mutate(nervous_nonresponse_percent=nervous_did_not_report/(nervous_not_at_all+nervous_several_days+nervous_half+nervous_everyday+nervous_did_not_report),
+         worry_nonresponse_percent=worry_did_not_report/(worry_not_at_all+worry_several_days+worry_half+worry_everyday+worry_did_not_report))
+
+##DATA QUALITY CHECKS
+View(health2a_data)
+
+```
+
+## STEP 3: IMPORT AND ADD STANDARD ERROR
+```{r}
+#Parent directory by week: https://www2.census.gov/programs-surveys/demo/tables/hhp/2020/
+
+#Health table 2a column names
+health2a_colnames <-
+  c("select_characteristics","nervous_not_at_all","nervous_several_days","nervous_half","nervous_everyday","nervous_did_not_report","worry_not_at_all","worry_several_days","worry_half","worry_everyday","worry_did_not_report")
+categorynames <- c('total','age','age','age','age','age','age','age',
+                          'sex','sex',
+                          'race','race','race','race','race',
+                          'education','education','education','education',
+                          'maritalstatus','maritalstatus','maritalstatus',
+                          'maritalstatus','maritalstatus',
+                          'householdsize','householdsize','householdsize',
+                          'householdsize','householdsize','householdsize',
+                          'householdsize','children','children','lossincome',
+                          'lossincome','lossincome',
+                          'currentemploy','currentemploy',
+                          'currentemploy',
+                          'income','income','income','income','income','income',
+                          'income','income','income',
+                          'spending','spending','spending',
+                          'spending','spending','spending',
+                          'spending','spending','spending')
+
+#Import from Census parent directory
+temp.file <- paste(tempfile(),".xlsx",sep = "")
+download.file(paste0
+                ("https://www2.census.gov/programs-surveys/demo/tables/hhp/2020/wk",week,"/health2a_se_week",week,".xlsx"), 
+                temp.file, mode = "wb")
+
+health2a_data_se <- read_excel(temp.file, sheet=paste0(state_abbr),skip = 6) %>%
+    set_names(health2a_colnames) %>%
+  
+  #remove extra rows at beginning and end
+    subset(!is.na(select_characteristics)) %>%
+    filter(!str_detect(select_characteristics, "Totals may not sum")) %>%
+    filter(!str_detect(select_characteristics, "The Census Bureau considers")) %>%
+    filter(!str_detect(select_characteristics, "Select characteristics")) %>%
+  
+  #remove row headers, but then add back in category name
+    subset(!is.na(nervous_not_at_all)) %>%
+    add_column(categorynames) %>%
+  
+  #assign dashes to na
+    na_if("-") %>%
+  
+  #convert numeric variables to numeric
+    mutate_at(vars(nervous_not_at_all,nervous_several_days,nervous_half,nervous_everyday,nervous_did_not_report,worry_not_at_all,worry_several_days,worry_half,worry_everyday,worry_did_not_report),
+              list(~ as.numeric(.))) %>%
+  
+  #convert NA's to zero
+  replace(is.na(.),0) %>%
+  
+  #add in variable for week and state
+  mutate(week=all_of(week)) %>%
+  mutate(state=all_of(state_abbr)) %>%
+  
+  #change variable names to _se
+  rename(nervous_not_at_all_se=nervous_not_at_all,
+         nervous_several_days_se=nervous_several_days,
+         nervous_half_se=nervous_half,
+         nervous_everyday_se=nervous_everyday,
+         nervous_did_not_report_se=nervous_did_not_report,
+         worry_not_at_all_se=worry_not_at_all,
+         worry_several_days_se=worry_several_days,
+         worry_half_se=worry_half,
+         worry_everyday_se=worry_everyday,
+         worry_did_not_report_se=worry_did_not_report) 
+
+
+##DATA QUALITY CHECKS
+View(health2a_data_se)
+
+```
+
+## STEP 4: COMBINE DATA AND STANDARD ERROR
+```{r}
+health2a_datacombined <- health2a_data %>%
+  left_join(health2a_data_se,by=c('select_characteristics'='select_characteristics',
+                             'week'='week','categorynames'='categorynames',
+                             'state'='state'))
+
+##DATA QUALITY CHECKS
+View(health2a_datacombined)
+```
+
+## STEP 5: ADD MOST RECENT WEEK DATA TO SQL DATABASE
+```{r}
+dbWriteTable(con,'health2a',health2a_datacombined,append=TRUE,row.names=FALSE)
+```
+
