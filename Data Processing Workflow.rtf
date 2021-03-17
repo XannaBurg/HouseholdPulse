@@ -78,11 +78,41 @@ EDUCATION6 - Impact of Coronavirus Pandemic on Post-Secondary Education Plans\
 \
 3. Run the \'91education calculations.Rmd\'92 to create custom calculations needed for the data visualization.\
 	In this code, update the week and state_abbr objects.\
-		[Demographic data is not calculated prior to weeks 13-16]\
+		[Demographic data is not calculated prior to week 13]\
 \
 \
 \
 \'97 FOR HEALTH DATA \'97 \'93Health & Well-Being\'94\
+HEALTH1 - Coronavirus pandemic related problems with access to medical care, in last 4 weeks, by select characteristics\
+1. Run the \'91health1 import.Rmd\'92 to import Health Table 1, and add to SQL database.\
+	In this code, update the week and state_abbr objects\
+	*If Health Table 1 published by the Census changes, this code may need to be adapted.\
+		[The version health1 import_weeks 13.21 worked for weeks 13-21]\
+		[The version health1 import_weeks 7.12 worked for weeks 7-12]\
+		[The version health1 import_weeks 1.6 worked for weeks 1-6]\
+\
+HEALTH2a - Symptoms of anxiety experienced in the last 7 days, by select characteristics\
+2. Run the \'91health2a import.Rmd\'92 to import Health Table 2a, and add to SQL database.\
+	In this code, update the week and state_abbr objects\
+	*If Health Table 2a published by the Census changes, this code may need to be adapted.\
+		[The version health2a import_weeks 13.21 worked for weeks 13-21]\
+		[The version health2a import_weeks 7.12 worked for weeks 7-12]\
+		[The version health2a import_weeks 1.6 worked for weeks 1-6]\
+\
+HEALTH2b - Symptoms of depression experienced in the last 7 days, by select characteristics\
+3. Run the \'91health2b import.Rmd\'92 to import Health Table 2b, and add to SQL database.\
+	In this code, update the week and state_abbr objects\
+	*If Health Table 2b published by the Census changes, this code may need to be adapted.\
+		[The version health2b import_weeks 13.21 worked for weeks 13-21]\
+		[The version health2b import_weeks 7.12 worked for weeks 7-12]\
+		[The version health2b import_weeks 1.6 worked for weeks 1-6]\
+\
+\
+4. Run the \'91health calculations.Rmd\'92 to create custom calculations needed for the data visualization.\
+	In this code, update the week and state_abbr objects.\
+		[Demographic data is not calculated prior to week 13]\
+\
+\
 \
 \
 }
