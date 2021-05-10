@@ -3,6 +3,7 @@ title: "Household Pulse Education 6"
 output: html_document
 ---
 
+#CODE WORKS FOR WEEKS 22-27
 #STORE DATA IN SQL DATABASE: education6
 
 ## This code simply imports the data from Education Table 6, and calculates a nonresponse percent.

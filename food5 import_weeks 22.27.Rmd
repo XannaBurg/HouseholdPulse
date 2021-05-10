@@ -3,6 +3,7 @@ title: "Household Pulse Food 5"
 output: html_document
 ---
 
+#THIS CODE WORKS FOR WEEKS 22-27
 #IMPORT HOUSEHOLD PULSE DATA FROM TABLE FOOD 5
 #STORE DATA IN SQL DATABASE: food5
 
@@ -16,7 +17,7 @@ library(stringr)
 
 ## STEP 1: UPDATE THE MOST RECENT WEEK FOR DOWNLOADING DATA
 ```{r}
-week <- 28
+week <- 27
 state_abbr <- 'SD'
 ```
 
@@ -30,8 +31,12 @@ food5_colnames <-
 categorynames <- c('total',
                    'recentfoodinsufficiencyreason','recentfoodinsufficiencyreason',
                    'recentfoodinsufficiencyreason','recentfoodinsufficiencyreason',
-                   'recentfoodinsufficiencyreason',
+                   'recentfoodinsufficiencyreason','recentfoodinsufficiencyreason',
                    'freegroceries','freegroceries','freegroceries',
+                   'freegroceries_provider','freegroceries_provider',
+                   'freegroceries_provider','freegroceries_provider',
+                   'freegroceries_provider','freegroceries_provider',
+                   'freegroceries_provider','freegroceries_provider',
                    'foodathome','foodathome',
                    'foodawayfromhome','foodawayfromhome',
                    'childrennoteating','childrennoteating',
@@ -41,14 +46,7 @@ categorynames <- c('total',
                    'nointerest','nointerest','nointerest','nointerest','nointerest',
                    'depressed','depressed','depressed','depressed','depressed',
                    'spending','spending','spending','spending','spending','spending',
-                   'spending','spending','spending','spending',
-                   'military','military','military','military',
-                    'military','military',
-                    'seeing','seeing','seeing','seeing','seeing',
-                    'hearing','hearing','hearing','hearing','hearing',
-                    'concentrating','concentrating','concentrating',
-                    'concentrating','concentrating',
-                    'walking','walking','walking','walking','walking',
+                   'spending','spending','spending',
                    'snap','snap','snap')
 
 #Import from Census parent directory
@@ -95,6 +93,30 @@ View(food5_data)
 ## STEP 3: IMPORT AND ADD STANDARD ERROR
 ```{r}
 #Parent directory by week: https://www2.census.gov/programs-surveys/demo/tables/hhp/2021/
+
+#Food table 5 column names
+food5_colnames <-
+  c("select_characteristics", "total", "enough_not_types", "sometimes_not_enough", "often_not_enough", "did_not_report")
+categorynames <- c('total',
+                   'recentfoodinsufficiencyreason','recentfoodinsufficiencyreason',
+                   'recentfoodinsufficiencyreason','recentfoodinsufficiencyreason',
+                   'recentfoodinsufficiencyreason','recentfoodinsufficiencyreason',
+                   'freegroceries','freegroceries','freegroceries',
+                   'freegroceries_provider','freegroceries_provider',
+                   'freegroceries_provider','freegroceries_provider',
+                   'freegroceries_provider','freegroceries_provider',
+                   'freegroceries_provider','freegroceries_provider',
+                   'foodathome','foodathome',
+                   'foodawayfromhome','foodawayfromhome',
+                   'childrennoteating','childrennoteating',
+                   'childrennoteating','childrennoteating',
+                   'anxious','anxious','anxious','anxious','anxious',
+                   'worry','worry','worry','worry','worry',
+                   'nointerest','nointerest','nointerest','nointerest','nointerest',
+                   'depressed','depressed','depressed','depressed','depressed',
+                   'spending','spending','spending','spending','spending','spending',
+                   'spending','spending','spending',
+                   'snap','snap','snap')
 
 #Import from Census parent directory
 temp.file <- paste(tempfile(),".xlsx",sep = "")

@@ -3,6 +3,7 @@ title: "Household Pulse Housing 1B"
 output: html_document
 ---
 
+#THIS CODE WORKS FOR WEEKS 22-27
 #IMPORT HOUSEHOLD PULSE DATA FROM TABLE HOUSING 1B
 #STORE DATA IN SQL DATABASE: housing1b
 
@@ -18,7 +19,7 @@ library(stringr)
 
 ## STEP 1: UPDATE THE MOST RECENT WEEK FOR DOWNLOADING DATA
 ```{r}
-week <- 28
+week <- 27
 state_abbr <- 'SD'
 ```
 
@@ -45,14 +46,7 @@ categorynames <- c('total','age','age','age','age','age',
                           'income','income','income',
                           'spending','spending','spending',
                           'spending','spending','spending',
-                          'spending','spending','spending','spending',
-                          'military','military','military','military',
-                          'military','military',
-                          'seeing','seeing','seeing','seeing','seeing',
-                          'hearing','hearing','hearing','hearing','hearing',
-                          'concentrating','concentrating','concentrating',
-                          'concentrating','concentrating',
-                          'walking','walking','walking','walking','walking')
+                          'spending','spending','spending')
 
 #Import from Census parent directory
 temp.file <- paste(tempfile(),".xlsx",sep = "")
@@ -100,6 +94,27 @@ View(housing1b_data)
 ## STEP 3: IMPORT AND ADD STANDARD ERROR
 ```{r}
 #Parent directory by week: https://www2.census.gov/programs-surveys/demo/tables/hhp/2021/
+
+#Housing table 1b column names
+housing1b_colnames <-
+  c("select_characteristics", "total", "occupied_without_rent", "yes_caughtup", "no_notcaughtup", "did_not_report", "did_not_report_tenure")
+categorynames <- c('total','age','age','age','age','age',
+                          'sex','sex',
+                          'race','race','race','race','race',
+                          'education','education','education','education',
+                          'maritalstatus','maritalstatus','maritalstatus',
+                          'maritalstatus','maritalstatus',
+                          'householdsize','householdsize','householdsize',
+                          'householdsize','householdsize','householdsize',
+                          'householdsize','children','children','lossincome',
+                          'lossincome','lossincome',
+                          'currentemploy','currentemploy',
+                          'currentemploy',
+                          'income','income','income','income','income','income',
+                          'income','income','income',
+                          'spending','spending','spending',
+                          'spending','spending','spending',
+                          'spending','spending','spending')
 
 #Import from Census parent directory
 temp.file <- paste(tempfile(),".xlsx",sep = "")

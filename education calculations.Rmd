@@ -16,7 +16,7 @@ library(stringr)
 
 ## STEP 1: UPDATE THE MOST RECENT WEEK FOR DOWNLOADING DATA
 ```{r}
-week <- 27
+week <- 28
 state_abbr <- 'SD'
 ```
 
@@ -322,62 +322,62 @@ Hispanic or Latino (may be of any race)','Latino (any race)')) %>%
 ####### -- Calculate College Plans Canceled for Young Adults -- #####
 
 #sql code to import most recent 12 weeks of education6 data
-education_sql2 <- paste0("SELECT * FROM education6 WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"' OR week='",week_minus4,"' OR week='",week_minus5,"' OR week='",week_minus6,"' OR week='",week_minus7,"' OR week='",week_minus8,"' OR week='",week_minus9,"' OR week='",week_minus10,"' OR week='",week_minus11,"');")
+#education_sql2 <- paste0("SELECT * FROM education6 WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"' OR week='",week_minus4,"' OR week='",week_minus5,"' OR week='",week_minus6,"' OR week='",week_minus7,"' OR week='",week_minus8,"' OR week='",week_minus9,"' OR week='",week_minus10,"' OR week='",week_minus11,"');")
 
 
-education_12weeks_data3 <- dbGetQuery(con,education_sql2) %>%
+#education_12weeks_data3 <- dbGetQuery(con,education_sql2) %>%
   
-  subset(categorynames=='age' & select_characteristics=='18 - 24') %>%
+  #subset(categorynames=='age' & select_characteristics=='18 - 24') %>%
   
   #covert variables to numeric
-  mutate(canceled=as.numeric(paste(canceled)),
-         canceled_se=as.numeric(paste(canceled_se)),
-         total=as.numeric(paste(total)),
-         total_se=as.numeric(paste(total_se)),
-         did_not_report=as.numeric(paste(did_not_report)),
-         did_not_report_se=as.numeric(paste(did_not_report_se))) %>%
+  #mutate(canceled=as.numeric(paste(canceled)),
+    #     canceled_se=as.numeric(paste(canceled_se)),
+     #    total=as.numeric(paste(total)),
+      #   total_se=as.numeric(paste(total_se)),
+       #  did_not_report=as.numeric(paste(did_not_report)),
+        # did_not_report_se=as.numeric(paste(did_not_report_se))) %>%
   
   #combine twelve weeks of data
-  group_by(select_characteristics,categorynames,state) %>%
-  summarise(canceled_numerator=sum(canceled,na.rm=TRUE),
-            canceled_numerator_se=sqrt((sum(canceled_se^2))),
-            did_not_report=sum(did_not_report,na.rm=TRUE),
-            did_not_report_se=sqrt((sum(did_not_report_se^2))),
-            total=sum(total,na.rm=TRUE),
-            total_se=sqrt((sum(total_se^2))),
-            totalvalidresponses=total-did_not_report,
-            totalvalidresponses_se=sqrt((total_se^2)-(did_not_report_se^2)),
-            .groups='keep') %>%
-  ungroup %>%
-  arrange(categorynames,select_characteristics) %>%
+  #group_by(select_characteristics,categorynames,state) %>%
+  #summarise(canceled_numerator=sum(canceled,na.rm=TRUE),
+   #         canceled_numerator_se=sqrt((sum(canceled_se^2))),
+    #        did_not_report=sum(did_not_report,na.rm=TRUE),
+     #       did_not_report_se=sqrt((sum(did_not_report_se^2))),
+      #      total=sum(total,na.rm=TRUE),
+       #     total_se=sqrt((sum(total_se^2))),
+        #    totalvalidresponses=total-did_not_report,
+         #   totalvalidresponses_se=sqrt((total_se^2)-(did_not_report_se^2)),
+          #  .groups='keep') %>%
+  #ungroup %>%
+  #arrange(categorynames,select_characteristics) %>%
   
   #calculate percent cancelled, se, and confidence interval
-  mutate(percent=canceled_numerator/totalvalidresponses) %>%
-  mutate(percent_se=(1/totalvalidresponses)*(sqrt((canceled_numerator_se^2)-((percent^2)*(totalvalidresponses_se^2))))) %>%
-  mutate(percent_se=if_else(is.na(percent_se),(1/totalvalidresponses)*(sqrt((canceled_numerator_se^2)+((percent^2)*(totalvalidresponses_se^2)))),percent_se)) %>%
-  mutate(percent_lci=percent-(percent_se*1.645)) %>%
-  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  #mutate(percent=canceled_numerator/totalvalidresponses) %>%
+  #mutate(percent_se=(1/totalvalidresponses)*(sqrt((canceled_numerator_se^2)-((percent^2)*(totalvalidresponses_se^2))))) %>%
+  #mutate(percent_se=if_else(is.na(percent_se),(1/totalvalidresponses)*(sqrt((canceled_numerator_se^2)+((percent^2)*(totalvalidresponses_se^2)))),percent_se)) %>%
+  #mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  #mutate(percent_uci=percent+(percent_se*1.645)) %>%
   
   #lower confidence interval shouldn't be less than zero, and upper more than 100
-  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
-  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  #mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  #mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
   
   
   #add indicator variable for unreliable estimates
-  mutate(percent_relativese=percent_se/percent) %>%
-  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  #mutate(percent_relativese=percent_se/percent) %>%
+  #mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
   
   #remove unneeded variables
-  select(-c(canceled_numerator,canceled_numerator_se,did_not_report,did_not_report_se,
-            total,total_se,
-            totalvalidresponses,totalvalidresponses_se,percent_relativese)) %>%
+  #select(-c(canceled_numerator,canceled_numerator_se,did_not_report,did_not_report_se,
+        #    total,total_se,
+        #    totalvalidresponses,totalvalidresponses_se,percent_relativese)) %>%
   
 
   #add back in database variables
-  mutate(week_start=all_of(week_minus11),
-         week_end=all_of(week),
-         timeframe='12-week rolling average',
-         varname='postsecondaryeducationcanceled_youngadults')
+  #mutate(week_start=all_of(week_minus11),
+   #      week_end=all_of(week),
+    #     timeframe='12-week rolling average',
+     #    varname='postsecondaryeducationcanceled_youngadults')
 
 
 
@@ -386,8 +386,8 @@ education_12weeks_data3 <- dbGetQuery(con,education_sql2) %>%
 
 #COMBINE DATASETS
 education_12weeks_data_combined <- education_12weeks_data %>%
-  bind_rows(education_12weeks_data2) %>%
-  bind_rows(education_12weeks_data3)
+  bind_rows(education_12weeks_data2) #%>%
+#  bind_rows(education_12weeks_data3)
 
 #DATA QUALITY CHECKS
 View(education_12weeks_data_combined)

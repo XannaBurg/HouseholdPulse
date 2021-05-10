@@ -1,12 +1,12 @@
 ---
-title: "Household Pulse Food 2"
+title: "Household Pulse Food 3"
 output: html_document
 ---
 
-#STARTING IN WEEK 22, THE TABLES TRANSITIONED TO FOOD 2
-#STORE DATA IN SQL DATABASE: food2b
-
-## This code simply imports the data from Food Table 2, and calculates the food insufficient numerator, denominator, and a nonresponse percent.
+#THIS CODE WORKS FOR WEEKS 22-27
+#STARTING IN WEEK 22, THE TABLES TRANSITIONED TO FOOD 3
+#IMPORT HOUSEHOLD PULSE DATA FROM TABLE FOOD 3
+#STORE DATA IN SQL DATABASE: food3b
 
 
 ```{r}
@@ -18,7 +18,7 @@ library(stringr)
 
 ## STEP 1: UPDATE THE MOST RECENT WEEK FOR DOWNLOADING DATA
 ```{r}
-week <- 28
+week <- 27
 state_abbr <- 'SD'
 ```
 
@@ -26,8 +26,8 @@ state_abbr <- 'SD'
 ```{r}
 #Parent directory by week: https://www2.census.gov/programs-surveys/demo/tables/hhp/2021/
 
-#Food table 2 column names
-food2b_colnames <-
+#Food table 3b column names
+food3b_colnames <-
   c("select_characteristics", "total", "enough_types_food", "enough_not_types", "sometimes_not_enough", "often_not_enough", "did_not_report")
 categorynames <- c('total','age','age','age','age','age',
                           'sex','sex',
@@ -37,26 +37,19 @@ categorynames <- c('total','age','age','age','age','age',
                           'maritalstatus','maritalstatus',
                           'householdsize','householdsize','householdsize',
                           'householdsize','householdsize','householdsize',
-                          'householdsize','children','children','lossincome',
+                          'householdsize','lossincome',
                           'lossincome','lossincome',
                           'currentemploy','currentemploy',
                           'currentemploy','notworkreason','notworkreason',
                           'notworkreason','notworkreason','notworkreason',
                           'notworkreason','notworkreason','notworkreason',
                           'notworkreason','notworkreason','notworkreason',
-                          'notworkreason','notworkreason',
+                          'notworkreason','notworkreason','notworkreason',
                           'income','income','income','income','income','income',
                           'income','income','income',
                           'spending','spending','spending',
                           'spending','spending','spending',
-                          'spending','spending','spending','spending',
-                          'military','military','military','military',
-                          'military','military',
-                          'seeing','seeing','seeing','seeing','seeing',
-                          'hearing','hearing','hearing','hearing','hearing',
-                          'concentrating','concentrating','concentrating',
-                          'concentrating','concentrating',
-                          'walking','walking','walking','walking','walking',
+                          'spending','spending','spending',
                           'snap','snap','snap',
                           'anxious','anxious','anxious',
                           'anxious','anxious','worry','worry','worry',
@@ -70,16 +63,20 @@ categorynames <- c('total','age','age','age','age','age',
                           'nextrent','nextrent','nextrent',
                           'nextrent',
                           'nextrent','nextrent','freegroceries','freegroceries',
-                          'freegroceries')
+                          'freegroceries','freegroceries_provider',
+                          'freegroceries_provider','freegroceries_provider',
+                          'freegroceries_provider','freegroceries_provider',
+                          'freegroceries_provider','freegroceries_provider',
+                          'freegroceries_provider')
 
 #Import from Census parent directory
 temp.file <- paste(tempfile(),".xlsx",sep = "")
 download.file(paste0
-                ("https://www2.census.gov/programs-surveys/demo/tables/hhp/2021/wk",week,"/food2_week",week,".xlsx"), 
+                ("https://www2.census.gov/programs-surveys/demo/tables/hhp/2021/wk",week,"/food3_week",week,".xlsx"), 
                 temp.file, mode = "wb")
 
-food2b_data <- read_excel(temp.file, sheet=paste0(state_abbr),skip = 5) %>%
-    set_names(food2b_colnames) %>%
+food3b_data <- read_excel(temp.file, sheet=paste0(state_abbr),skip = 5) %>%
+    set_names(food3b_colnames) %>%
   
   #remove extra rows at beginning and end
     subset(!is.na(select_characteristics)) %>%
@@ -112,7 +109,7 @@ food2b_data <- read_excel(temp.file, sheet=paste0(state_abbr),skip = 5) %>%
   mutate(nonresponse_percent=did_not_report/total)
 
 ##DATA QUALITY CHECKS
-View(food2b_data)
+View(food3b_data)
 
 ```
 
@@ -120,14 +117,57 @@ View(food2b_data)
 ```{r}
 #Parent directory by week: https://www2.census.gov/programs-surveys/demo/tables/hhp/2021/
 
+#Food table 3b column names
+food3b_colnames <-
+  c("select_characteristics", "total", "enough_types_food", "enough_not_types", "sometimes_not_enough", "often_not_enough", "did_not_report")
+categorynames <- c('total','age','age','age','age','age',
+                          'sex','sex',
+                          'race','race','race','race','race',
+                          'education','education','education','education',
+                          'maritalstatus','maritalstatus','maritalstatus',
+                          'maritalstatus','maritalstatus',
+                          'householdsize','householdsize','householdsize',
+                          'householdsize','householdsize','householdsize',
+                          'householdsize','lossincome',
+                          'lossincome','lossincome',
+                          'currentemploy','currentemploy',
+                          'currentemploy','notworkreason','notworkreason',
+                          'notworkreason','notworkreason','notworkreason',
+                          'notworkreason','notworkreason','notworkreason',
+                          'notworkreason','notworkreason','notworkreason',
+                          'notworkreason','notworkreason','notworkreason',
+                          'income','income','income','income','income','income',
+                          'income','income','income',
+                          'spending','spending','spending',
+                          'spending','spending','spending',
+                          'spending','spending','spending',
+                          'snap','snap','snap',
+                          'anxious','anxious','anxious',
+                          'anxious','anxious','worry','worry','worry',
+                          'worry','worry',
+                          'nointerest','nointerest','nointerest','nointerest',
+                          'nointerest','depressed',
+                          'depressed','depressed','depressed',
+                          'depressed','healthinsurance','healthinsurance',
+                          'healthinsurance','lastrent','lastrent',
+                          'lastrent','lastrent',
+                          'nextrent','nextrent','nextrent',
+                          'nextrent',
+                          'nextrent','nextrent','freegroceries','freegroceries',
+                          'freegroceries','freegroceries_provider',
+                          'freegroceries_provider','freegroceries_provider',
+                          'freegroceries_provider','freegroceries_provider',
+                          'freegroceries_provider','freegroceries_provider',
+                          'freegroceries_provider')
+
 #Import from Census parent directory
 temp.file <- paste(tempfile(),".xlsx",sep = "")
 download.file(paste0
-                ("https://www2.census.gov/programs-surveys/demo/tables/hhp/2021/wk",week,"/food2_se_week",week,".xlsx"), 
+                ("https://www2.census.gov/programs-surveys/demo/tables/hhp/2021/wk",week,"/food3_se_week",week,".xlsx"), 
                 temp.file, mode = "wb")
 
-food2b_data_se <- read_excel(temp.file, sheet=paste0(state_abbr),skip = 5) %>%
-    set_names(food2b_colnames) %>%
+food3b_data_se <- read_excel(temp.file, sheet=paste0(state_abbr),skip = 5) %>%
+    set_names(food3b_colnames) %>%
   
   #remove extra rows at beginning and end
     subset(!is.na(select_characteristics)) %>%
@@ -168,24 +208,23 @@ food2b_data_se <- read_excel(temp.file, sheet=paste0(state_abbr),skip = 5) %>%
            (sometimes_not_enough_se^2)+(often_not_enough_se^2))) 
 
 ##DATA QUALITY CHECKS
-View(food2b_data_se)
+View(food3b_data_se)
 
 ```
 
 ## STEP 4: COMBINE DATA AND STANDARD ERROR
 ```{r}
-food2b_datacombined <- food2b_data %>%
-  left_join(food2b_data_se,by=c('select_characteristics'='select_characteristics',
+food3b_datacombined <- food3b_data %>%
+  left_join(food3b_data_se,by=c('select_characteristics'='select_characteristics',
                              'week'='week','categorynames'='categorynames',
                              'state'='state'))
 
 ##DATA QUALITY CHECKS
-View(food2b_datacombined)
+View(food3b_datacombined)
 ```
 
 ## STEP 5: ADD MOST RECENT WEEK DATA TO SQL DATABASE
 ```{r}
-dbWriteTable(con,'food2b',food2b_datacombined,append=TRUE,row.names=FALSE)
+dbWriteTable(con,'food3b',food3b_datacombined,append=TRUE,row.names=FALSE)
 ```
-
 

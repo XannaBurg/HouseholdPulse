@@ -3,6 +3,7 @@ title: "Household Pulse Food 2"
 output: html_document
 ---
 
+#THIS CODE WORKS FOR WEEKS 22-27
 #STARTING IN WEEK 22, THE TABLES TRANSITIONED TO FOOD 2
 #STORE DATA IN SQL DATABASE: food2b
 
@@ -18,7 +19,7 @@ library(stringr)
 
 ## STEP 1: UPDATE THE MOST RECENT WEEK FOR DOWNLOADING DATA
 ```{r}
-week <- 28
+week <- 27
 state_abbr <- 'SD'
 ```
 
@@ -44,19 +45,12 @@ categorynames <- c('total','age','age','age','age','age',
                           'notworkreason','notworkreason','notworkreason',
                           'notworkreason','notworkreason','notworkreason',
                           'notworkreason','notworkreason','notworkreason',
-                          'notworkreason','notworkreason',
+                          'notworkreason','notworkreason','notworkreason',
                           'income','income','income','income','income','income',
                           'income','income','income',
                           'spending','spending','spending',
                           'spending','spending','spending',
-                          'spending','spending','spending','spending',
-                          'military','military','military','military',
-                          'military','military',
-                          'seeing','seeing','seeing','seeing','seeing',
-                          'hearing','hearing','hearing','hearing','hearing',
-                          'concentrating','concentrating','concentrating',
-                          'concentrating','concentrating',
-                          'walking','walking','walking','walking','walking',
+                          'spending','spending','spending',
                           'snap','snap','snap',
                           'anxious','anxious','anxious',
                           'anxious','anxious','worry','worry','worry',
@@ -70,7 +64,11 @@ categorynames <- c('total','age','age','age','age','age',
                           'nextrent','nextrent','nextrent',
                           'nextrent',
                           'nextrent','nextrent','freegroceries','freegroceries',
-                          'freegroceries')
+                          'freegroceries','freegroceries_provider',
+                          'freegroceries_provider','freegroceries_provider',
+                          'freegroceries_provider','freegroceries_provider',
+                          'freegroceries_provider','freegroceries_provider',
+                          'freegroceries_provider')
 
 #Import from Census parent directory
 temp.file <- paste(tempfile(),".xlsx",sep = "")
@@ -119,6 +117,49 @@ View(food2b_data)
 ## STEP 3: IMPORT AND ADD STANDARD ERROR
 ```{r}
 #Parent directory by week: https://www2.census.gov/programs-surveys/demo/tables/hhp/2021/
+
+#Food table 2 column names
+food2b_colnames <-
+  c("select_characteristics", "total", "enough_types_food", "enough_not_types", "sometimes_not_enough", "often_not_enough", "did_not_report")
+categorynames <- c('total','age','age','age','age','age',
+                          'sex','sex',
+                          'race','race','race','race','race',
+                          'education','education','education','education',
+                          'maritalstatus','maritalstatus','maritalstatus',
+                          'maritalstatus','maritalstatus',
+                          'householdsize','householdsize','householdsize',
+                          'householdsize','householdsize','householdsize',
+                          'householdsize','children','children','lossincome',
+                          'lossincome','lossincome',
+                          'currentemploy','currentemploy',
+                          'currentemploy','notworkreason','notworkreason',
+                          'notworkreason','notworkreason','notworkreason',
+                          'notworkreason','notworkreason','notworkreason',
+                          'notworkreason','notworkreason','notworkreason',
+                          'notworkreason','notworkreason','notworkreason',
+                          'income','income','income','income','income','income',
+                          'income','income','income',
+                          'spending','spending','spending',
+                          'spending','spending','spending',
+                          'spending','spending','spending',
+                          'snap','snap','snap',
+                          'anxious','anxious','anxious',
+                          'anxious','anxious','worry','worry','worry',
+                          'worry','worry',
+                          'nointerest','nointerest','nointerest','nointerest',
+                          'nointerest','depressed',
+                          'depressed','depressed','depressed',
+                          'depressed','healthinsurance','healthinsurance',
+                          'healthinsurance','lastrent','lastrent',
+                          'lastrent','lastrent',
+                          'nextrent','nextrent','nextrent',
+                          'nextrent',
+                          'nextrent','nextrent','freegroceries','freegroceries',
+                          'freegroceries','freegroceries_provider',
+                          'freegroceries_provider','freegroceries_provider',
+                          'freegroceries_provider','freegroceries_provider',
+                          'freegroceries_provider','freegroceries_provider',
+                          'freegroceries_provider')
 
 #Import from Census parent directory
 temp.file <- paste(tempfile(),".xlsx",sep = "")

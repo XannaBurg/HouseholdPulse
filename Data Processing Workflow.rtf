@@ -13,14 +13,16 @@ FOOD2 or FOOD2B - Food Sufficiency for All Households\
 1. Run the \'91food2 import.Rmd\'92 to import Food Table 2, and add to SQL database.\
 	In this code, update the week and state_abbr objects \
 	*If Food Table 2 published by the Census changes, this code may need to be adapted.\
+		[The version food2 import_weeks22.27 worked for weeks 22-27]\
 		[The version food2b import_weeks13.21 worked for weeks 13-21]\
 		[The version food2b import_weeks7.12 worked for weeks 7-12]\
 		[The version food2b import_weeks1.6 worked for weeks 1-6]\
-\
+		\
 FOOD 3 or FOOD3B - Food Sufficiency for Households with Children\
 2. Run the \'91food3 import.Rmd\'92 to import Food Table 3, and add to SQL database.\
 	In this code, update the week and state_abbr objects\
 	*If Food Table 3 published by the Census changes, this code may need to be adapted.\
+		[The version food3 import_weeks22.27 worked for weeks 22-27]\
 		[The version food3b import_weeks13.21 worked for weeks 13-21]\
 		[The version food3b import_weeks7.12 worked for weeks 7-12]\
 		[The version food3b import_weeks1.6 worked for weeks 1-6]\
@@ -29,6 +31,7 @@ FOOD5 - Recent Food Insufficiency for Households with Children\
 3. Run the \'91food5 import.Rmd\'94 to import Food Table 5, and add to SQL database.\
 	In this code, update the week and state_abbr objects\
 	*If Food Table 5 published by the Census changes, this code may need to be adapted.\
+		[The version food5_weeks22.27 import worked for weeks 22-27]\
 		[The version food5_weeks13.21 import worked for weeks 13-21]\
 		[The version food5_weeks7.12 import worked for weeks 7-12]\
 		[The version food5_weeks6 import worked for week 6]\
@@ -48,6 +51,7 @@ HOUSING1B - Last month\'92s payment status for renter-occupied unites\
 1. Run the \'91housing1b import.Rmd\'92 to import Housing Table 1b, and add to SQL database.\
 	In this code, update the week and state_abbr objects\
 	*If Housing Table 1b published by the Census changes, this code may need to be adapted.\
+		[The version housing1b import_weeks22.27 import worked for weeks 22-27] \
 		[The version housing1b import_weeks13.21 import worked for weeks 13-21] \
 		[The version housing1b import_weeks7.12 import worked for weeks 7-12] \
 		[The version housing1b import_weeks1.6 import worked for weeks 1-6] \
@@ -65,6 +69,7 @@ EDUCATION3 - Computer and internet availability in households with children in p
 1. Run the \'91education3 import.Rmd\'92 to import Education Table 3, and add to SQL database.\
 	In this code, update the week and state_abbr objects\
 	*If Education Table 3 published by the Census changes, this code may need to be adapted.\
+		[The version education3 import_weeks22.27 import worked for weeks 22-27]\
 		[The version education3 import_weeks13.21 import worked for weeks 13-21]\
 		[The version education3 import_weeks1.12 import worked for weeks 1-12]\
 \
@@ -76,7 +81,14 @@ EDUCATION6 - Impact of Coronavirus Pandemic on Post-Secondary Education Plans\
 		[The version education 6 import_weeks 13.21 import worked for weeks 13-21]\
 		[Note: there was no table 6 for weeks 1-12.]\
 \
-3. Run the \'91education calculations.Rmd\'92 to create custom calculations needed for the data visualization.\
+	Starting in week 28, the table was changed to current term vs. fall term, and changed to #7. Discontinuing importing this data for now. Rolling 12-week averages are calculated for weeks ending 24-27.\
+\
+EDUCATION6 - Childcare Arrangements in the Last 4 Weeks, by Select Characteristics\
+*Starting in week 28, there was a new Table 6 that was for child care. We cannot call this table 6, so the new table in the database is called education6v2.\
+3. **ADD IN CHILD CARE NOTES BY WEEK 31**\
+\
+\
+4. Run the \'91education calculations.Rmd\'92 to create custom calculations needed for the data visualization.\
 	In this code, update the week and state_abbr objects.\
 		[Demographic data is not calculated prior to week 13]\
 \
@@ -87,6 +99,7 @@ HEALTH1 - Coronavirus pandemic related problems with access to medical care, in 
 1. Run the \'91health1 import.Rmd\'92 to import Health Table 1, and add to SQL database.\
 	In this code, update the week and state_abbr objects\
 	*If Health Table 1 published by the Census changes, this code may need to be adapted.\
+		[The version health1 import_weeks 22.27 worked for weeks 22-27]\
 		[The version health1 import_weeks 13.21 worked for weeks 13-21]\
 		[The version health1 import_weeks 7.12 worked for weeks 7-12]\
 		[The version health1 import_weeks 1.6 worked for weeks 1-6]\
@@ -95,6 +108,7 @@ HEALTH2a - Symptoms of anxiety experienced in the last 7 days, by select charact
 2. Run the \'91health2a import.Rmd\'92 to import Health Table 2a, and add to SQL database.\
 	In this code, update the week and state_abbr objects\
 	*If Health Table 2a published by the Census changes, this code may need to be adapted.\
+		[The version health2a import_weeks 22.27 worked for weeks 22-27]\
 		[The version health2a import_weeks 13.21 worked for weeks 13-21]\
 		[The version health2a import_weeks 7.12 worked for weeks 7-12]\
 		[The version health2a import_weeks 1.6 worked for weeks 1-6]\
@@ -103,6 +117,7 @@ HEALTH2b - Symptoms of depression experienced in the last 7 days, by select char
 3. Run the \'91health2b import.Rmd\'92 to import Health Table 2b, and add to SQL database.\
 	In this code, update the week and state_abbr objects\
 	*If Health Table 2b published by the Census changes, this code may need to be adapted.\
+		[The version health2b import_weeks 22.27 worked for weeks 22-27]\
 		[The version health2b import_weeks 13.21 worked for weeks 13-21]\
 		[The version health2b import_weeks 7.12 worked for weeks 7-12]\
 		[The version health2b import_weeks 1.6 worked for weeks 1-6]\

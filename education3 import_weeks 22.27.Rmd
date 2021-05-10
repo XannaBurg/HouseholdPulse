@@ -3,6 +3,7 @@ title: "Household Pulse Education 3"
 output: html_document
 ---
 
+#CODE WORKS FOR WEEKS 22-27
 #STORE DATA IN SQL DATABASE: education3
 
 ## This code simply imports the data from Education Table 3, and calculates a nonresponse percent.
@@ -17,7 +18,7 @@ library(stringr)
 
 ## STEP 1: UPDATE THE MOST RECENT WEEK FOR DOWNLOADING DATA
 ```{r}
-week <- 28
+week <- 27
 state_abbr <- 'SD'
 ```
 
@@ -35,22 +36,15 @@ categorynames <- c('total','age','age','age','age','age',
                           'maritalstatus','maritalstatus','maritalstatus',
                           'maritalstatus','maritalstatus',
                           'children','children',
-                          'internet_paid','internet_paid',
-                          'internet_paid','internet_paid','internet_paid',
+                          'computer_source','computer_source',
+                          'computer_source','computer_source',
+                          'internet_source','internet_source',
+                          'internet_source','internet_source',
                           'lossincome','lossincome','lossincome',
                           'currentemploy','currentemploy',
                           'currentemploy',
                           'income','income','income','income','income','income',
-                          'income','income','income',
-                          'spending','spending','spending','spending','spending',
-                          'spending','spending','spending','spending','spending',
-                          'military','military','military','military',
-                          'military','military',
-                          'seeing','seeing','seeing','seeing','seeing',
-                          'hearing','hearing','hearing','hearing','hearing',
-                          'concentrating','concentrating','concentrating',
-                          'concentrating','concentrating',
-                          'walking','walking','walking','walking','walking')
+                          'income','income','income')
 
 #Import from Census parent directory
 temp.file <- paste(tempfile(),".xlsx",sep = "")
@@ -100,6 +94,26 @@ View(education3_data)
 ## STEP 3: IMPORT AND ADD STANDARD ERROR
 ```{r}
 #Parent directory by week: https://www2.census.gov/programs-surveys/demo/tables/hhp/2021/
+
+#Education table 3 column names
+education3_colnames <-
+  c("select_characteristics", "total", "computer_always", "computer_usually", "computer_sometimes", "computer_rarely", "computer_never", "computer_did_not_report", "internet_always", "internet_usually", "internet_sometimes", "internet_rarely", "internet_never", "internet_did_not_report")
+categorynames <- c('total','age','age','age','age','age',
+                          'sex','sex',
+                          'race','race','race','race','race',
+                          'education','education','education','education',
+                          'maritalstatus','maritalstatus','maritalstatus',
+                          'maritalstatus','maritalstatus',
+                          'children','children',
+                          'computer_source','computer_source',
+                          'computer_source','computer_source',
+                          'internet_source','internet_source',
+                          'internet_source','internet_source',
+                          'lossincome','lossincome','lossincome',
+                          'currentemploy','currentemploy',
+                          'currentemploy',
+                          'income','income','income','income','income','income',
+                          'income','income','income')
 
 #Import from Census parent directory
 temp.file <- paste(tempfile(),".xlsx",sep = "")
