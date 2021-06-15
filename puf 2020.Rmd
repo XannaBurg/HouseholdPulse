@@ -1,0 +1,205 @@
+---
+title: "Import PUF"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(tidycensus)
+library(readxl)
+library(httr)
+library(stringr)
+library(survey)
+library(srvyr)
+```
+
+```{r}
+statename <- 'Montana'
+
+
+
+#DO NOT EDIT 
+#county and state names that match fips codes (from tidycensus package)
+fips <- fips_codes
+#for FIPS code matching state name
+statecode <- as.numeric(unique(fips$state_code[fips$state_name==statename]))
+```
+
+#read in PUF file
+```{r}
+puf_week1 <- read.csv(paste0("./puf/puf 2020/pulse2020_puf_01.csv"))
+puf_week2 <- read.csv(paste0("./puf/puf 2020/pulse2020_puf_02.csv"))
+puf_week3 <- read.csv(paste0("./puf/puf 2020/pulse2020_puf_03.csv"))
+puf_week4 <- read.csv(paste0("./puf/puf 2020/pulse2020_puf_04.csv"))
+puf_week5 <- read.csv(paste0("./puf/puf 2020/pulse2020_puf_05.csv"))
+puf_week6 <- read.csv(paste0("./puf/puf 2020/pulse2020_puf_06.csv"))
+puf_week7 <- read.csv(paste0("./puf/puf 2020/pulse2020_puf_07.csv"))
+puf_week8 <- read.csv(paste0("./puf/puf 2020/pulse2020_puf_08.csv"))
+puf_week9 <- read.csv(paste0("./puf/puf 2020/pulse2020_puf_09.csv"))
+puf_week10 <- read.csv(paste0("./puf/puf 2020/pulse2020_puf_10.csv"))
+puf_week11 <- read.csv(paste0("./puf/puf 2020/pulse2020_puf_11.csv"))
+puf_week12 <- read.csv(paste0("./puf/puf 2020/pulse2020_puf_12.csv"))
+puf_week13 <- read.csv(paste0("./puf/puf 2020/pulse2020_puf_13.csv"))
+puf_week14 <- read.csv(paste0("./puf/puf 2020/pulse2020_puf_14.csv"))
+puf_week15 <- read.csv(paste0("./puf/puf 2020/pulse2020_puf_15.csv"))
+puf_week16 <- read.csv(paste0("./puf/puf 2020/pulse2020_puf_16.csv"))
+puf_week17 <- read.csv(paste0("./puf/puf 2020/pulse2020_puf_17.csv"))
+puf_week18 <- read.csv(paste0("./puf/puf 2020/pulse2020_puf_18.csv"))
+puf_week19 <- read.csv(paste0("./puf/puf 2020/pulse2020_puf_19.csv"))
+puf_week20 <- read.csv(paste0("./puf/puf 2020/pulse2020_puf_20.csv"))
+puf_week21 <- read.csv(paste0("./puf/puf 2020/pulse2020_puf_21.csv"))
+
+
+puf_2020combined <- puf_week1 %>%
+  bind_rows(puf_week2) %>%
+  bind_rows(puf_week3) %>%
+  bind_rows(puf_week4) %>%
+  bind_rows(puf_week5) %>%
+  bind_rows(puf_week6) %>%
+  bind_rows(puf_week7) %>%
+  bind_rows(puf_week8) %>%
+  bind_rows(puf_week9) %>%
+  bind_rows(puf_week10) %>%
+  bind_rows(puf_week11) %>%
+  bind_rows(puf_week12) %>%
+  bind_rows(puf_week13) %>%
+  bind_rows(puf_week14) %>%
+  bind_rows(puf_week15) %>%
+  bind_rows(puf_week16) %>%
+  bind_rows(puf_week17) %>%
+  bind_rows(puf_week18) %>%
+  bind_rows(puf_week19) %>%
+  bind_rows(puf_week20) %>%
+  bind_rows(puf_week21) 
+
+```
+
+#read in replicate weights
+```{r}
+puf_wts_week1 <- read.csv(paste0("./puf/puf 2020/pulse2020_repwgt_puf_01.csv"))
+puf_wts_week2 <- read.csv(paste0("./puf/puf 2020/pulse2020_repwgt_puf_02.csv"))
+puf_wts_week3 <- read.csv(paste0("./puf/puf 2020/pulse2020_repwgt_puf_03.csv"))
+puf_wts_week4 <- read.csv(paste0("./puf/puf 2020/pulse2020_repwgt_puf_04.csv"))
+puf_wts_week5 <- read.csv(paste0("./puf/puf 2020/pulse2020_repwgt_puf_05.csv"))
+puf_wts_week6 <- read.csv(paste0("./puf/puf 2020/pulse2020_repwgt_puf_06.csv"))
+puf_wts_week7 <- read.csv(paste0("./puf/puf 2020/pulse2020_repwgt_puf_07.csv"))
+puf_wts_week8 <- read.csv(paste0("./puf/puf 2020/pulse2020_repwgt_puf_08.csv"))
+puf_wts_week9 <- read.csv(paste0("./puf/puf 2020/pulse2020_repwgt_puf_09.csv"))
+puf_wts_week10 <- read.csv(paste0("./puf/puf 2020/pulse2020_repwgt_puf_10.csv"))
+puf_wts_week11 <- read.csv(paste0("./puf/puf 2020/pulse2020_repwgt_puf_11.csv"))
+puf_wts_week12 <- read.csv(paste0("./puf/puf 2020/pulse2020_repwgt_puf_12.csv"))
+puf_wts_week13 <- read.csv(paste0("./puf/puf 2020/pulse2020_repwgt_puf_13.csv"))
+puf_wts_week14 <- read.csv(paste0("./puf/puf 2020/pulse2020_repwgt_puf_14.csv"))
+puf_wts_week15 <- read.csv(paste0("./puf/puf 2020/pulse2020_repwgt_puf_15.csv"))
+puf_wts_week16 <- read.csv(paste0("./puf/puf 2020/pulse2020_repwgt_puf_16.csv"))
+puf_wts_week17 <- read.csv(paste0("./puf/puf 2020/pulse2020_repwgt_puf_17.csv"))
+puf_wts_week18 <- read.csv(paste0("./puf/puf 2020/pulse2020_repwgt_puf_18.csv"))
+puf_wts_week19 <- read.csv(paste0("./puf/puf 2020/pulse2020_repwgt_puf_19.csv"))
+puf_wts_week20 <- read.csv(paste0("./puf/puf 2020/pulse2020_repwgt_puf_20.csv"))
+puf_wts_week21 <- read.csv(paste0("./puf/puf 2020/pulse2020_repwgt_puf_21.csv"))
+
+
+puf_wts_2020combined <- puf_wts_week1 %>%
+  bind_rows(puf_wts_week2) %>%
+  bind_rows(puf_wts_week3) %>%
+  bind_rows(puf_wts_week4) %>%
+  bind_rows(puf_wts_week5) %>%
+  bind_rows(puf_wts_week6) %>%
+  bind_rows(puf_wts_week7) %>%
+  bind_rows(puf_wts_week8) %>%
+  bind_rows(puf_wts_week9) %>%
+  bind_rows(puf_wts_week10) %>%
+  bind_rows(puf_wts_week11) %>%
+  bind_rows(puf_wts_week12) %>%
+  bind_rows(puf_wts_week13) %>%
+  bind_rows(puf_wts_week14) %>%
+  bind_rows(puf_wts_week15) %>%
+  bind_rows(puf_wts_week16) %>%
+  bind_rows(puf_wts_week17) %>%
+  bind_rows(puf_wts_week18) %>%
+  bind_rows(puf_wts_week19) %>%
+  bind_rows(puf_wts_week20) %>%
+  bind_rows(puf_wts_week21) %>%
+  select(c(SCRAM,starts_with('PWEIGHT')))
+
+```
+
+```{r}
+puf_cleaned <- puf_2020combined %>%
+  subset(EST_ST==all_of(statecode)) %>% #subset for state of interest
+  
+  #recode demographic variables of interest
+  mutate(race_recode=case_when(
+    RRACE=='1' & RHISPANIC=='1' ~ 'White,Non-Hispanic',
+    RRACE=='2' | RRACE=='3' | RRACE=='4' ~ 'Other/multiracial')) %>%
+  mutate(ethnicity_recode=case_when(
+    RHISPANIC=='1' ~ 'Non-Hispanic',
+    RHISPANIC=='2' ~ 'Hispanic')) %>%
+  mutate(householdswithchildren=case_when(
+    THHLD_NUMKID==0 ~ 'Adults with no children in household',
+    THHLD_NUMKID>=1 ~ 'Adults with children in household')) %>%
+
+  #recode the housing confidence
+  mutate(housing_confidence=case_when(
+    MORTCONF=='1' | MORTCONF=='2' ~ 'slight_or_no_confidence',
+    MORTCONF=='3' | MORTCONF=='4' | MORTCONF=='5' ~ 'moderate_high_deferred',
+    MORTCONF=='-99' | MORTCONF=='-88' ~ 'did_not_report')) %>%
+  
+  #merge replicate weights
+  left_join(puf_wts_2020combined,by=c('SCRAM'='SCRAM')) 
+
+
+puf_cleaned_children <- puf_cleaned %>%
+  subset(householdswithchildren=='Adults with children in household')
+
+
+
+#import survey design to use in the srvyr package
+svy <- as_survey(puf_cleaned,weights=PWEIGHT,repweights=matches("pweight\\d"),
+                 scale=4/80,
+                 rscales=rep(1,80),
+                 mse=TRUE,
+                 type='JK1')
+
+svy_children <- as_survey(puf_cleaned_children,weights=PWEIGHT,repweights=matches("pweight\\d"),
+                 scale=4/80,
+                 rscales=rep(1,80),
+                 mse=TRUE,
+                 type='JK1')
+
+```
+
+
+#Housing Data
+```{r}
+
+## -- HOUSEHOLDS WITH CHILDREN -- ##
+#calculate the weighted housing confidence and se
+housing_confidence_children <- svy_children %>%
+  group_by(housing_confidence,race_recode) %>%
+  survey_count() 
+
+View(housing_confidence_children)
+
+#calculate denominator
+housing_confidence_children_denominator <- svy_children %>%
+  group_by(TENURE,race_recode) %>%
+  survey_count() 
+
+View(housing_confidence_children_denominator)
+```
+
+```{r}
+housing_confidence_children <- svy_children %>%
+  group_by(housing_confidence,RRACE) %>%
+  survey_count() 
+
+View(housing_confidence_children)
+
+housing_confidence_children_denominator <- svy_children %>%
+  group_by(TENURE,RRACE) %>%
+  survey_count() 
+
+View(housing_confidence_children_denominator)
+
+```
