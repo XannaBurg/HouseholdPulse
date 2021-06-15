@@ -18,7 +18,7 @@ library(stringr)
 
 ## STEP 1: UPDATE THE MOST RECENT WEEK FOR DOWNLOADING DATA
 ```{r}
-week <- 29
+week <- 30
 state_abbr <- 'SD'
 ```
 
