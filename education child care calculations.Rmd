@@ -1,0 +1,620 @@
+---
+title: "Household Pulse Education Calculations"
+output: html_document
+---
+
+## This code uses data imported from Education Tables 6 (child care version only) in order to calculate percentages used in the data viz.
+
+
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(httr)
+library(stringr)
+```
+
+## STEP 1: UPDATE THE MOST RECENT WEEK FOR DOWNLOADING DATA
+```{r}
+week <- 32
+state_abbr <- 'SD'
+```
+
+
+## STEP 2: CALCULATE ROLLING 4 "WEEK" AVERAGES
+```{r}
+week_minus1 <- week-1
+week_minus2 <- week-2
+week_minus3 <- week-3
+
+####### -- Calculate Percent Children Unable to Attend Daycare -- #####
+
+#sql code to import most recent 4 weeks of education table 6 child care data
+childcare_sql <- paste0("SELECT * FROM education6childcare WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"');")
+
+childcare_4weeks_data <- dbGetQuery(con,childcare_sql) %>%
+  
+  subset(categorynames=='total') %>%
+  
+  #covert variables to numeric
+  mutate(total=as.numeric(paste(total)),
+         total_se=as.numeric(paste(total_se)),
+         total_notattend=as.numeric(paste(total_notattend)),
+         total_notattend_se=as.numeric(paste(total_notattend_se)),
+         unpaid_leave=as.numeric(paste(unpaid_leave)),
+         unpaid_leave_se=as.numeric(paste(unpaid_leave_se)),
+         paid_leave=as.numeric(paste(paid_leave)),
+         paid_leave_se=as.numeric(paste(paid_leave_se)),
+         cut_hours=as.numeric(paste(cut_hours)),
+         cut_hours_se=as.numeric(paste(cut_hours_se)),
+         left_job=as.numeric(paste(left_job)),
+         left_job_se=as.numeric(paste(left_job_se)),
+         lost_job=as.numeric(paste(lost_job)),
+         lost_job_se=as.numeric(paste(lost_job_se)),
+         not_look_job=as.numeric(paste(not_look_job)),
+         not_look_job_se=as.numeric(paste(not_look_job_se)),
+         watch_while_work=as.numeric(paste(watch_while_work)),
+         watch_while_work_se=as.numeric(paste(watch_while_work_se)),
+         other=as.numeric(paste(other)),
+         other_se=as.numeric(paste(other_se)),
+         none_of_above=as.numeric(paste(none_of_above)),
+         none_of_above_se=as.numeric(paste(none_of_above_se)),
+         did_not_report_notattend=as.numeric(paste(did_not_report_notattend)),
+         did_not_report_notattend_se=as.numeric(paste(did_not_report_notattend_se)),
+         total_attend=as.numeric(paste(total_attend)),
+         total_attend_se=as.numeric(paste(total_attend_se)),
+         did_not_report=as.numeric(paste(did_not_report)),
+         did_not_report_se=as.numeric(paste(did_not_report_se))) %>%
+  
+  #combine four weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(total_notattend=sum(total_notattend,na.rm=TRUE),
+            total_notattend_se=sqrt((sum(total_notattend_se^2))),
+            totalvalidresponses=sum(c(total_notattend,total_attend),na.rm=TRUE),
+            totalvalidresponses_se=sqrt(sum(total_notattend_se^2)+sum(total_attend_se^2)),
+            .groups='keep') %>%
+  ungroup %>%
+  arrange(categorynames,select_characteristics) %>%
+  
+  #calculate percent not attend, se, and confidence interval
+  mutate(percent=total_notattend/totalvalidresponses) %>%
+  mutate(percent_se=(1/totalvalidresponses)*(sqrt((total_notattend_se^2)-((percent^2)*(totalvalidresponses_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/totalvalidresponses)*(sqrt((total_notattend_se^2)+((percent^2)*(totalvalidresponses_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(total_notattend,total_notattend_se,totalvalidresponses,totalvalidresponses_se,percent_relativese)) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus3),
+         week_end=all_of(week),
+         timeframe='4-week rolling average',
+         varname='childrenunabletoattenddaycarebecausepandemic')
+
+
+
+####### -- Calculate Percent For Reasons Why Children Unable to Attend Daycare -- #####
+
+#sql code to import most recent 4 weeks of education table 6 child care data
+childcare_sql2 <- paste0("SELECT * FROM education6childcare WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"');")
+
+childcare_4weeks_data2 <- dbGetQuery(con,childcare_sql2) %>%
+  
+  subset(categorynames=='total') %>%
+  
+  #covert variables to numeric
+  mutate(total=as.numeric(paste(total)),
+         total_se=as.numeric(paste(total_se)),
+         total_notattend=as.numeric(paste(total_notattend)),
+         total_notattend_se=as.numeric(paste(total_notattend_se)),
+         unpaid_leave=as.numeric(paste(unpaid_leave)),
+         unpaid_leave_se=as.numeric(paste(unpaid_leave_se)),
+         paid_leave=as.numeric(paste(paid_leave)),
+         paid_leave_se=as.numeric(paste(paid_leave_se)),
+         cut_hours=as.numeric(paste(cut_hours)),
+         cut_hours_se=as.numeric(paste(cut_hours_se)),
+         left_job=as.numeric(paste(left_job)),
+         left_job_se=as.numeric(paste(left_job_se)),
+         lost_job=as.numeric(paste(lost_job)),
+         lost_job_se=as.numeric(paste(lost_job_se)),
+         not_look_job=as.numeric(paste(not_look_job)),
+         not_look_job_se=as.numeric(paste(not_look_job_se)),
+         watch_while_work=as.numeric(paste(watch_while_work)),
+         watch_while_work_se=as.numeric(paste(watch_while_work_se)),
+         other=as.numeric(paste(other)),
+         other_se=as.numeric(paste(other_se)),
+         none_of_above=as.numeric(paste(none_of_above)),
+         none_of_above_se=as.numeric(paste(none_of_above_se)),
+         did_not_report_notattend=as.numeric(paste(did_not_report_notattend)),
+         did_not_report_notattend_se=as.numeric(paste(did_not_report_notattend_se)),
+         total_attend=as.numeric(paste(total_attend)),
+         total_attend_se=as.numeric(paste(total_attend_se)),
+         did_not_report=as.numeric(paste(did_not_report)),
+         did_not_report_se=as.numeric(paste(did_not_report_se))) %>%
+  
+  #combine four weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(total_notattend_reason_denominator=sum(total_notattend,na.rm=TRUE)-sum(did_not_report_notattend,na.rm=TRUE),
+            total_notattend_reason_denominator_se=sqrt(sum(total_notattend_se^2)+sum(did_not_report_notattend_se^2)),
+            unpaid_leave=sum(unpaid_leave,na.rm=TRUE),
+            unpaid_leave_se=sqrt(sum(unpaid_leave_se^2)),
+            paid_leave=sum(paid_leave,na.rm=TRUE),
+            paid_leave_se=sqrt(sum(unpaid_leave_se^2)),
+            cut_hours=sum(cut_hours,na.rm=TRUE),
+            cut_hours_se=sqrt(sum(cut_hours_se^2)),
+            left_job=sum(left_job,na.rm=TRUE),
+            left_job_se=sqrt(sum(left_job_se^2)),
+            lost_job=sum(lost_job,na.rm=TRUE),
+            lost_job_se=sqrt(sum(lost_job_se^2)),
+            not_look_job=sum(not_look_job,na.rm=TRUE),
+            not_look_job_se=sqrt(sum(not_look_job_se^2)),
+            watch_while_work=sum(watch_while_work,na.rm=TRUE),
+            watch_while_work_se=sqrt(sum(watch_while_work_se^2)),.groups='keep') %>%
+  ungroup %>%
+  arrange(categorynames,select_characteristics) 
+  
+  #calculate percent, se, and confidence interval
+
+#UNPAID LEAVE
+percent_unpaidleave <- childcare_4weeks_data2 %>%
+  mutate(percent=unpaid_leave/total_notattend_reason_denominator) %>%
+  mutate(percent_se=(1/total_notattend_reason_denominator)*(sqrt((unpaid_leave_se^2)-((percent^2)*(total_notattend_reason_denominator_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/total_notattend_reason_denominator)*(sqrt((unpaid_leave_se^2)+((percent^2)*(total_notattend_reason_denominator_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(total_notattend_reason_denominator,total_notattend_reason_denominator_se,unpaid_leave,unpaid_leave_se,paid_leave,paid_leave_se,cut_hours,cut_hours_se,left_job,left_job_se,lost_job,lost_job_se,not_look_job,not_look_job_se,watch_while_work,watch_while_work_se,percent_relativese)) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus3),
+         week_end=all_of(week),
+         timeframe='4-week rolling average',
+         varname='childrenunabletoattenddaycarebecause_unpaidleave')
+
+
+#PAID LEAVE
+percent_paidleave <- childcare_4weeks_data2 %>%
+  mutate(percent=paid_leave/total_notattend_reason_denominator) %>%
+  mutate(percent_se=(1/total_notattend_reason_denominator)*(sqrt((paid_leave_se^2)-((percent^2)*(total_notattend_reason_denominator_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/total_notattend_reason_denominator)*(sqrt((paid_leave_se^2)+((percent^2)*(total_notattend_reason_denominator_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(total_notattend_reason_denominator,total_notattend_reason_denominator_se,unpaid_leave,unpaid_leave_se,paid_leave,paid_leave_se,cut_hours,cut_hours_se,left_job,left_job_se,lost_job,lost_job_se,not_look_job,not_look_job_se,watch_while_work,watch_while_work_se,percent_relativese)) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus3),
+         week_end=all_of(week),
+         timeframe='4-week rolling average',
+         varname='childrenunabletoattenddaycarebecause_paidleave')
+
+#CUT HOURS
+percent_cuthours <-childcare_4weeks_data2 %>%
+  mutate(percent=cut_hours/total_notattend_reason_denominator) %>%
+  mutate(percent_se=(1/total_notattend_reason_denominator)*(sqrt((cut_hours_se^2)-((percent^2)*(total_notattend_reason_denominator_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/total_notattend_reason_denominator)*(sqrt((cut_hours_se^2)+((percent^2)*(total_notattend_reason_denominator_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(total_notattend_reason_denominator,total_notattend_reason_denominator_se,unpaid_leave,unpaid_leave_se,paid_leave,paid_leave_se,cut_hours,cut_hours_se,left_job,left_job_se,lost_job,lost_job_se,not_look_job,not_look_job_se,watch_while_work,watch_while_work_se,percent_relativese)) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus3),
+         week_end=all_of(week),
+         timeframe='4-week rolling average',
+         varname='childrenunabletoattenddaycarebecause_cuthours')
+
+#LEFT JOB
+percent_leftjob <- childcare_4weeks_data2 %>%
+  mutate(percent=left_job/total_notattend_reason_denominator) %>%
+  mutate(percent_se=(1/total_notattend_reason_denominator)*(sqrt((left_job_se^2)-((percent^2)*(total_notattend_reason_denominator_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/total_notattend_reason_denominator)*(sqrt((left_job_se^2)+((percent^2)*(total_notattend_reason_denominator_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(total_notattend_reason_denominator,total_notattend_reason_denominator_se,unpaid_leave,unpaid_leave_se,paid_leave,paid_leave_se,cut_hours,cut_hours_se,left_job,left_job_se,lost_job,lost_job_se,not_look_job,not_look_job_se,watch_while_work,watch_while_work_se,percent_relativese)) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus3),
+         week_end=all_of(week),
+         timeframe='4-week rolling average',
+         varname='childrenunabletoattenddaycarebecause_leftjob')
+
+#LOST JOB
+percent_lostjob <- childcare_4weeks_data2 %>%
+  mutate(percent=lost_job/total_notattend_reason_denominator) %>%
+  mutate(percent_se=(1/total_notattend_reason_denominator)*(sqrt((lost_job_se^2)-((percent^2)*(total_notattend_reason_denominator_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/total_notattend_reason_denominator)*(sqrt((lost_job_se^2)+((percent^2)*(total_notattend_reason_denominator_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(total_notattend_reason_denominator,total_notattend_reason_denominator_se,unpaid_leave,unpaid_leave_se,paid_leave,paid_leave_se,cut_hours,cut_hours_se,left_job,left_job_se,lost_job,lost_job_se,not_look_job,not_look_job_se,watch_while_work,watch_while_work_se,percent_relativese)) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus3),
+         week_end=all_of(week),
+         timeframe='4-week rolling average',
+         varname='childrenunabletoattenddaycarebecause_lostjob')
+
+#NOT LOOKING FOR JOB
+percent_notlookingforjob <-childcare_4weeks_data2 %>%
+  mutate(percent=not_look_job/total_notattend_reason_denominator) %>%
+  mutate(percent_se=(1/total_notattend_reason_denominator)*(sqrt((not_look_job_se^2)-((percent^2)*(total_notattend_reason_denominator_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/total_notattend_reason_denominator)*(sqrt((not_look_job_se^2)+((percent^2)*(total_notattend_reason_denominator_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(total_notattend_reason_denominator,total_notattend_reason_denominator_se,unpaid_leave,unpaid_leave_se,paid_leave,paid_leave_se,cut_hours,cut_hours_se,left_job,left_job_se,lost_job,lost_job_se,not_look_job,not_look_job_se,watch_while_work,watch_while_work_se,percent_relativese)) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus3),
+         week_end=all_of(week),
+         timeframe='4-week rolling average',
+         varname='childrenunabletoattenddaycarebecause_notlookingforjob')
+
+#WATCHING KIDS WHILE WORK
+percent_watchkidswhilework <- childcare_4weeks_data2 %>%
+  mutate(percent=watch_while_work/total_notattend_reason_denominator) %>%
+  mutate(percent_se=(1/total_notattend_reason_denominator)*(sqrt((watch_while_work_se^2)-((percent^2)*(total_notattend_reason_denominator_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/total_notattend_reason_denominator)*(sqrt((watch_while_work_se^2)+((percent^2)*(total_notattend_reason_denominator_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(total_notattend_reason_denominator,total_notattend_reason_denominator_se,unpaid_leave,unpaid_leave_se,paid_leave,paid_leave_se,cut_hours,cut_hours_se,left_job,left_job_se,lost_job,lost_job_se,not_look_job,not_look_job_se,watch_while_work,watch_while_work_se,percent_relativese)) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus3),
+         week_end=all_of(week),
+         timeframe='4-week rolling average',
+         varname='childrenunabletoattenddaycarebecause_watchkidswhilework')
+
+
+####### -- COMBINE DATA TABLES -- #####
+#combine data tables
+childcare_4weeks_combined <- childcare_4weeks_data %>%
+  bind_rows(percent_unpaidleave) %>%
+  bind_rows(percent_paidleave) %>%
+  bind_rows(percent_cuthours) %>%
+  bind_rows(percent_leftjob) %>%
+  bind_rows(percent_lostjob) %>%
+  bind_rows(percent_notlookingforjob) %>%
+  bind_rows(percent_watchkidswhilework)
+  
+
+#DATA QUALITY CHECKS
+View(childcare_4weeks_combined)
+```
+
+
+## STEP 3: ADD ROLLING AVERAGE DATA TO SQL DATABASE
+```{r}
+dbWriteTable(con,'calculatedpercents',childcare_4weeks_combined,append=TRUE,row.names=FALSE)
+```
+
+
+## STEP 4: CALCULATE 12 "WEEK" AVERAGES FOR DEMOGRAPHICS
+#####ALL NEEDS TO BE UPDATED TO CHILD CARE DATA#######
+```{r}
+week_minus1 <- week-1
+week_minus2 <- week-2
+week_minus3 <- week-3
+week_minus4 <- week-4
+week_minus5 <- week-5
+week_minus6 <- week-6
+week_minus7 <- week-7
+week_minus8 <- week-8
+week_minus9 <- week-9
+week_minus10 <- week-10
+week_minus11 <- week-11
+
+####### -- Calculate Internet Usually/Always Available -- #####
+
+#sql code to import most recent 12 weeks of education3 data
+education_sql <- paste0("SELECT * FROM education3 WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"' OR week='",week_minus4,"' OR week='",week_minus5,"' OR week='",week_minus6,"' OR week='",week_minus7,"' OR week='",week_minus8,"' OR week='",week_minus9,"' OR week='",week_minus10,"' OR week='",week_minus11,"');")
+
+
+education_12weeks_data <- dbGetQuery(con,education_sql) %>%
+  
+  subset(categorynames=='age' | categorynames=='race' | categorynames=='total' 
+         | categorynames=='income') %>%
+  
+  #combine racial groups and income groups
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='Two or more races + Other races, not Hispanic' | 
+                                          select_characteristics=='Black alone, not Hispanic' | 
+                                          select_characteristics=='Asian alone, not Hispanic','Other/multiracial, not Latino')) %>%
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='Less than $25,000' | 
+                                          select_characteristics=='$25,000 - $34,999' | 
+                                          select_characteristics=='$35,000 - $49,999','Less than $50,000')) %>%
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='$50,000 - $74,999' | 
+                                          select_characteristics=='$75,000 - $99,999' | 
+                                          select_characteristics=='$100,000 - $149,999'
+                                         | select_characteristics=='$150,000 - $199,999' | select_characteristics=='$200,000 and above','More than $50,000')) %>%
+  subset(select_characteristics != 'Did not report') %>%
+  
+  #covert variables to numeric
+  mutate(internet_usually_always_numerator=
+           as.numeric(paste(internet_usually_always_numerator)),
+         internet_usually_always_numerator_se=
+           as.numeric(paste(internet_usually_always_numerator_se)),
+         internet_totalvalidresponses=as.numeric(paste(internet_totalvalidresponses)),
+         internet_totalvalidresponses_se=as.numeric(paste(internet_totalvalidresponses_se))) %>%
+  
+  #combine twelve weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(internet_usually_always_numerator=sum(internet_usually_always_numerator,na.rm=TRUE),
+            internet_usually_always_numerator_se=sqrt((sum(internet_usually_always_numerator_se^2))),
+            internet_totalvalidresponses=sum(internet_totalvalidresponses,na.rm=TRUE),
+            internet_totalvalidresponses_se=sqrt((sum(internet_totalvalidresponses_se^2))),
+            .groups='keep') %>%
+  ungroup %>%
+  arrange(categorynames,select_characteristics) %>%
+  
+  #calculate percent usually/always, se, and confidence interval
+  mutate(percent=internet_usually_always_numerator/internet_totalvalidresponses) %>%
+  mutate(percent_se=(1/internet_totalvalidresponses)*(sqrt((internet_usually_always_numerator_se^2)-((percent^2)*(internet_totalvalidresponses_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/internet_totalvalidresponses)*(sqrt((internet_usually_always_numerator_se^2)+((percent^2)*(internet_totalvalidresponses_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(internet_usually_always_numerator,internet_usually_always_numerator_se,
+            internet_totalvalidresponses,internet_totalvalidresponses_se,percent_relativese)) %>%
+  
+
+  
+  #rename some characteristics:
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='Total','All adults')) %>%
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='	
+Hispanic or Latino (may be of any race)','Latino (any race)')) %>%
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='White alone, not Hispanic','White, not Latino')) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus11),
+         week_end=all_of(week),
+         timeframe='12-week rolling average',
+         varname='internetusuallyalwaysavailable')
+
+
+
+####### -- Calculate Computer Usually/Always Available -- #####
+education_12weeks_data2 <- dbGetQuery(con,education_sql) %>%
+  
+  subset(categorynames=='age' | categorynames=='race' | categorynames=='total' 
+         | categorynames=='income') %>%
+  
+  #combine racial groups and income groups
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='Two or more races + Other races, not Hispanic' | 
+                                          select_characteristics=='Black alone, not Hispanic' | 
+                                          select_characteristics=='Asian alone, not Hispanic','Other/multiracial, not Latino')) %>%
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='Less than $25,000' | 
+                                          select_characteristics=='$25,000 - $34,999' | 
+                                          select_characteristics=='$35,000 - $49,999','Less than $50,000')) %>%
+  mutate(select_characteristics=replace(select_characteristics,
+                                        select_characteristics=='$50,000 - $74,999' | 
+                                          select_characteristics=='$75,000 - $99,999' | 
+                                          select_characteristics=='$100,000 - $149,999'
+                                         | select_characteristics=='$150,000 - $199,999' | select_characteristics=='$200,000 and above','More than $50,000')) %>%
+  subset(select_characteristics != 'Did not report') %>%
+  
+  #covert variables to numeric
+  mutate(computer_usually_always_numerator=
+           as.numeric(paste(computer_usually_always_numerator)),
+         computer_usually_always_numerator_se=
+           as.numeric(paste(computer_usually_always_numerator_se)),
+         computer_totalvalidresponses=as.numeric(paste(computer_totalvalidresponses)),
+         computer_totalvalidresponses_se=as.numeric(paste(computer_totalvalidresponses_se))) %>%
+  
+  #combine twelve weeks of data
+  group_by(select_characteristics,categorynames,state) %>%
+  summarise(computer_usually_always_numerator=sum(computer_usually_always_numerator,na.rm=TRUE),
+            computer_usually_always_numerator_se=sqrt((sum(computer_usually_always_numerator_se^2))),
+            computer_totalvalidresponses=sum(computer_totalvalidresponses,na.rm=TRUE),
+            computer_totalvalidresponses_se=sqrt((sum(computer_totalvalidresponses_se^2))),
+            .groups='keep') %>%
+  ungroup %>%
+  arrange(categorynames,select_characteristics) %>%
+  
+  #calculate percent usually sometimes, se, and confidence interval
+  mutate(percent=computer_usually_always_numerator/computer_totalvalidresponses) %>%
+  mutate(percent_se=(1/computer_totalvalidresponses)*(sqrt((computer_usually_always_numerator_se^2)-((percent^2)*(computer_totalvalidresponses_se^2))))) %>%
+  mutate(percent_se=if_else(is.na(percent_se),(1/computer_totalvalidresponses)*(sqrt((computer_usually_always_numerator_se^2)+((percent^2)*(computer_totalvalidresponses_se^2)))),percent_se)) %>%
+  mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  mutate(percent_relativese=percent_se/percent) %>%
+  mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  select(-c(computer_usually_always_numerator,computer_usually_always_numerator_se,
+            computer_totalvalidresponses,computer_totalvalidresponses_se,percent_relativese)) %>%
+  
+
+  
+  #rename some characteristics:
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='Total','All adults')) %>%
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='	
+Hispanic or Latino (may be of any race)','Latino (any race)')) %>%
+  mutate(select_characteristics=replace(select_characteristics,select_characteristics=='White alone, not Hispanic','White, not Latino')) %>%
+  
+  #add back in database variables
+  mutate(week_start=all_of(week_minus11),
+         week_end=all_of(week),
+         timeframe='12-week rolling average',
+         varname='computerusuallyalwaysavailable')
+
+
+####### -- Calculate College Plans Canceled for Young Adults -- #####
+
+#sql code to import most recent 12 weeks of education6 data
+#education_sql2 <- paste0("SELECT * FROM education6 WHERE state='",state_abbr,"' AND (week='",week,"' OR week='",week_minus1,"' OR week='",week_minus2,"' OR week='",week_minus3,"' OR week='",week_minus4,"' OR week='",week_minus5,"' OR week='",week_minus6,"' OR week='",week_minus7,"' OR week='",week_minus8,"' OR week='",week_minus9,"' OR week='",week_minus10,"' OR week='",week_minus11,"');")
+
+
+#education_12weeks_data3 <- dbGetQuery(con,education_sql2) %>%
+  
+  #subset(categorynames=='age' & select_characteristics=='18 - 24') %>%
+  
+  #covert variables to numeric
+  #mutate(canceled=as.numeric(paste(canceled)),
+    #     canceled_se=as.numeric(paste(canceled_se)),
+     #    total=as.numeric(paste(total)),
+      #   total_se=as.numeric(paste(total_se)),
+       #  did_not_report=as.numeric(paste(did_not_report)),
+        # did_not_report_se=as.numeric(paste(did_not_report_se))) %>%
+  
+  #combine twelve weeks of data
+  #group_by(select_characteristics,categorynames,state) %>%
+  #summarise(canceled_numerator=sum(canceled,na.rm=TRUE),
+   #         canceled_numerator_se=sqrt((sum(canceled_se^2))),
+    #        did_not_report=sum(did_not_report,na.rm=TRUE),
+     #       did_not_report_se=sqrt((sum(did_not_report_se^2))),
+      #      total=sum(total,na.rm=TRUE),
+       #     total_se=sqrt((sum(total_se^2))),
+        #    totalvalidresponses=total-did_not_report,
+         #   totalvalidresponses_se=sqrt((total_se^2)-(did_not_report_se^2)),
+          #  .groups='keep') %>%
+  #ungroup %>%
+  #arrange(categorynames,select_characteristics) %>%
+  
+  #calculate percent cancelled, se, and confidence interval
+  #mutate(percent=canceled_numerator/totalvalidresponses) %>%
+  #mutate(percent_se=(1/totalvalidresponses)*(sqrt((canceled_numerator_se^2)-((percent^2)*(totalvalidresponses_se^2))))) %>%
+  #mutate(percent_se=if_else(is.na(percent_se),(1/totalvalidresponses)*(sqrt((canceled_numerator_se^2)+((percent^2)*(totalvalidresponses_se^2)))),percent_se)) %>%
+  #mutate(percent_lci=percent-(percent_se*1.645)) %>%
+  #mutate(percent_uci=percent+(percent_se*1.645)) %>%
+  
+  #lower confidence interval shouldn't be less than zero, and upper more than 100
+  #mutate(percent_lci=replace(percent_lci,percent_lci<0,0)) %>%
+  #mutate(percent_uci=replace(percent_uci,percent_uci>1,1)) %>%
+  
+  
+  #add indicator variable for unreliable estimates
+  #mutate(percent_relativese=percent_se/percent) %>%
+  #mutate(keep=if_else(percent_relativese>.3,0,1)) %>%
+  
+  #remove unneeded variables
+  #select(-c(canceled_numerator,canceled_numerator_se,did_not_report,did_not_report_se,
+        #    total,total_se,
+        #    totalvalidresponses,totalvalidresponses_se,percent_relativese)) %>%
+  
+
+  #add back in database variables
+  #mutate(week_start=all_of(week_minus11),
+   #      week_end=all_of(week),
+    #     timeframe='12-week rolling average',
+     #    varname='postsecondaryeducationcanceled_youngadults')
+
+
+
+
+
+
+#COMBINE DATASETS
+education_12weeks_data_combined <- education_12weeks_data %>%
+  bind_rows(education_12weeks_data2) #%>%
+#  bind_rows(education_12weeks_data3)
+
+#DATA QUALITY CHECKS
+View(education_12weeks_data_combined)
+```
+
+
+## STEP 5: ADD ROLLING AVERAGE DATA TO SQL DATABASE
+```{r}
+dbWriteTable(con,'calculatedpercents',education_12weeks_data_combined,append=TRUE,row.names=FALSE)
+```
+
+
+

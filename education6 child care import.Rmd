@@ -1,12 +1,11 @@
 ---
-title: "Household Pulse Housing 1B"
+title: "Household Pulse Education 6 - Child Care"
 output: html_document
 ---
 
-#IMPORT HOUSEHOLD PULSE DATA FROM TABLE HOUSING 1B
-#STORE DATA IN SQL DATABASE: housing1b
+#STORE DATA IN SQL DATABASE: education6childcare
 
-## This code simply imports the data from Housing Table 1b, and calculates the not caught up numerator, denominator, and a nonresponse percent.
+## This code simply imports the data from Education Table 6 - child care, and calculates a nonresponse percent.
 
 
 ```{r}
@@ -26,26 +25,26 @@ state_abbr <- 'SD'
 ```{r}
 #Parent directory by week: https://www2.census.gov/programs-surveys/demo/tables/hhp/2021/
 
-#Housing table 1b column names
-housing1b_colnames <-
-  c("select_characteristics", "total", "occupied_without_rent", "yes_caughtup", "no_notcaughtup", "did_not_report", "did_not_report_tenure")
+#Education table 3 column names
+education6childcare_colnames <-
+  c("select_characteristics", "total", "total_notattend","unpaid_leave","paid_leave","cut_hours",
+    "left_job","lost_job","not_look_job","watch_while_work","other","none_of_above","did_not_report_notattend","total_attend","did_not_report")
 categorynames <- c('total','age','age','age','age','age',
                           'sex','sex',
                           'race','race','race','race','race',
                           'education','education','education','education',
                           'maritalstatus','maritalstatus','maritalstatus',
                           'maritalstatus','maritalstatus',
+                          'householdsize','householdsize','householdsize','householdsize',
                           'householdsize','householdsize','householdsize',
-                          'householdsize','householdsize','householdsize',
-                          'householdsize','children','children','lossincome',
-                          'lossincome','lossincome',
+                          'children','children',
+                          'lossincome','lossincome','lossincome',
                           'currentemploy','currentemploy',
                           'currentemploy',
                           'income','income','income','income','income','income',
                           'income','income','income',
-                          'spending','spending','spending',
-                          'spending','spending','spending',
-                          'spending','spending','spending','spending',
+                          'spending','spending','spending','spending','spending',
+                          'spending','spending','spending','spending','spending',
                           'military','military','military','military',
                           'military','military',
                           'seeing','seeing','seeing','seeing','seeing',
@@ -57,11 +56,11 @@ categorynames <- c('total','age','age','age','age','age',
 #Import from Census parent directory
 temp.file <- paste(tempfile(),".xlsx",sep = "")
 download.file(paste0
-                ("https://www2.census.gov/programs-surveys/demo/tables/hhp/2021/wk",week,"/housing1b_week",week,".xlsx"), 
+                ("https://www2.census.gov/programs-surveys/demo/tables/hhp/2021/wk",week,"/educ6_week",week,".xlsx"), 
                 temp.file, mode = "wb")
 
-housing1b_data <- read_excel(temp.file, sheet=paste0(state_abbr),skip = 5) %>%
-    set_names(housing1b_colnames) %>%
+education6childcare_data <- read_excel(temp.file, sheet=paste0(state_abbr),skip = 5) %>%
+    set_names(education6childcare_colnames) %>%
   
   #remove extra rows at beginning and end
     subset(!is.na(select_characteristics)) %>%
@@ -77,23 +76,20 @@ housing1b_data <- read_excel(temp.file, sheet=paste0(state_abbr),skip = 5) %>%
     na_if("-") %>%
   
   #convert numeric variables to numeric
-    mutate_at(vars(total,occupied_without_rent,yes_caughtup,
-                   no_notcaughtup,did_not_report,did_not_report_tenure),
+    mutate_at(vars(total,total_notattend,unpaid_leave,paid_leave,cut_hours,
+    left_job,lost_job,not_look_job,watch_while_work,other,none_of_above,did_not_report_notattend,total_attend,did_not_report),
               list(~ as.numeric(.))) %>%
   
   #add in variable for week and state
   mutate(week=all_of(week)) %>%
   mutate(state=all_of(state_abbr)) %>%
   
-  #calculate numerator, denominator %>%
   rowwise() %>%
-  mutate(notcaughtup_numerator=sum(no_notcaughtup,na.rm=TRUE),
-         notcaughtup_denominator=sum(yes_caughtup,no_notcaughtup,na.rm=TRUE)) %>%
   #calculate non-response rate for good measure
   mutate(nonresponse_percent=did_not_report/total)
 
 ##DATA QUALITY CHECKS
-View(housing1b_data)
+View(education6childcare_data)
 
 ```
 
@@ -104,11 +100,11 @@ View(housing1b_data)
 #Import from Census parent directory
 temp.file <- paste(tempfile(),".xlsx",sep = "")
 download.file(paste0
-                ("https://www2.census.gov/programs-surveys/demo/tables/hhp/2021/wk",week,"/housing1b_se_week",week,".xlsx"), 
+                ("https://www2.census.gov/programs-surveys/demo/tables/hhp/2021/wk",week,"/educ6_se_week",week,".xlsx"), 
                 temp.file, mode = "wb")
 
-housing1b_data_se <- read_excel(temp.file, sheet=paste0(state_abbr),skip = 5) %>%
-    set_names(housing1b_colnames) %>%
+education6childcare_data_se <- read_excel(temp.file, sheet=paste0(state_abbr),skip = 5) %>%
+    set_names(education6childcare_colnames) %>%
   
   #remove extra rows at beginning and end
     subset(!is.na(select_characteristics)) %>%
@@ -124,8 +120,8 @@ housing1b_data_se <- read_excel(temp.file, sheet=paste0(state_abbr),skip = 5) %>
     na_if("-") %>%
   
   #convert numeric variables to numeric
-    mutate_at(vars(total,occupied_without_rent,yes_caughtup,
-                   no_notcaughtup,did_not_report,did_not_report_tenure),
+    mutate_at(vars(total,total_notattend,unpaid_leave,paid_leave,cut_hours,
+    left_job,lost_job,not_look_job,watch_while_work,other,none_of_above,did_not_report_notattend,total_attend,did_not_report),
               list(~ as.numeric(.))) %>%
   
   #convert NA's to zero
@@ -137,34 +133,40 @@ housing1b_data_se <- read_excel(temp.file, sheet=paste0(state_abbr),skip = 5) %>
   
   #change variable names to _se
   rename(total_se=total,
-         occupied_without_rent_se=occupied_without_rent,
-         yes_caughtup_se=yes_caughtup,
-         no_notcaughtup_se=no_notcaughtup,
-         did_not_report_se=did_not_report,
-         did_not_report_tenure_se=did_not_report_tenure) %>%
+         total_notattend_se=total_notattend,
+         unpaid_leave_se=unpaid_leave,
+         paid_leave_se=paid_leave,
+         cut_hours_se=cut_hours,
+         left_job_se=left_job,
+         lost_job_se=lost_job,
+         not_look_job_se=not_look_job,
+         watch_while_work_se=watch_while_work,
+         other_se=other,
+         none_of_above_se=none_of_above,
+         did_not_report_notattend_se=did_not_report_notattend,
+         total_attend_se=total_attend,
+         did_not_report_se=did_not_report) 
   
-  #calculate numerator, denominator se's
-  mutate(notcaughtup_numerator_se=no_notcaughtup_se,
-         notcaughtup_denominator_se=sqrt((yes_caughtup_se^2)+(no_notcaughtup_se^2))) 
 
 ##DATA QUALITY CHECKS
-View(housing1b_data_se)
+View(education6childcare_data_se)
 
 ```
 
 ## STEP 4: COMBINE DATA AND STANDARD ERROR
 ```{r}
-housing1b_datacombined <- housing1b_data %>%
-  left_join(housing1b_data_se,by=c('select_characteristics'='select_characteristics',
+education6childcare_datacombined <- education6childcare_data %>%
+  left_join(education6childcare_data_se,by=c('select_characteristics'='select_characteristics',
                              'week'='week','categorynames'='categorynames',
                              'state'='state'))
 
 ##DATA QUALITY CHECKS
-View(housing1b_datacombined)
+View(education6childcare_datacombined)
 ```
 
 ## STEP 5: ADD MOST RECENT WEEK DATA TO SQL DATABASE
 ```{r}
-dbWriteTable(con,'housing1b',housing1b_datacombined,append=TRUE,row.names=FALSE)
+dbWriteTable(con,'education6childcare',education6childcare_datacombined,append=TRUE,row.names=FALSE)
 ```
+
 

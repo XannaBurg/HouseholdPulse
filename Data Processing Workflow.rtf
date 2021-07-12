@@ -84,13 +84,19 @@ EDUCATION6 - Impact of Coronavirus Pandemic on Post-Secondary Education Plans\
 	Starting in week 28, the table was changed to current term vs. fall term, and changed to #7. Discontinuing importing this data for now. Rolling 12-week averages are calculated for weeks ending 24-27.\
 \
 EDUCATION6 - Childcare Arrangements in the Last 4 Weeks, by Select Characteristics\
-*Starting in week 28, there was a new Table 6 that was for child care. We cannot call this table 6, so the new table in the database is called education6v2.\
-3. **ADD IN CHILD CARE NOTES BY WEEK 31**\
+*Starting in week 28, there was a new Table 6 that was for child care. We cannot call this table 6, so the new table in the database is called education6childcare.\
+3. Run the \'91education6 child care import.Rmd\'92 to import the new Education table 6 with child care, and add to SQL database.\
+	In this code, update the week and state_abbr objects.\
 \
 \
 4. Run the \'91education calculations.Rmd\'92 to create custom calculations needed for the data visualization.\
 	In this code, update the week and state_abbr objects.\
 		[Demographic data is not calculated prior to week 13]\
+\
+5. Run the \'91education child care calculations.Rmd\'92 to create custom calculations needed for the data visualization.\
+	In this code, update the week and state_abbr objects.\
+		[Demographic data starts for week 28-39] ***NEED TO WRITE THIS CODE ONCE WE REACH WEEK 39***\
+\
 \
 \
 \
